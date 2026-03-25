@@ -1,0 +1,11 @@
+{
+    "mcpServers": {
+        "laravel-boost": {
+            "command": "/Users/dmpb/.config/herd-lite/bin/php",
+            "args": [
+                "/Users/dmpb/Desktop/Projects/TeamTasker/temp/artisan",
+                "boost:mcp"
+            ]
+        }
+    }
+}
