@@ -3,7 +3,7 @@
         "laravel-boost": {
             "command": "/Users/dmpb/.config/herd-lite/bin/php",
             "args": [
-                "/Users/dmpb/Desktop/Projects/TeamTasker/temp/artisan",
+                "/Users/dmpb/Desktop/Projects/TeamTasker/artisan",
                 "boost:mcp"
             ]
         }
