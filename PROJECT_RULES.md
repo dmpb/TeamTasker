@@ -6,7 +6,7 @@
 
 TeamTasker is a SaaS multi-tenant application that allows teams to manage projects using a Kanban system.
 
-This project is built as a **fullstack monolith using Laravel + React**, fully integrated within the Laravel ecosystem.
+This project is built as a **fullstack monolith using Laravel + React with Inertia.js**, fully integrated within the Laravel ecosystem.
 
 ---
 
@@ -23,6 +23,7 @@ This project is built as a **fullstack monolith using Laravel + React**, fully i
 - React
 - TypeScript
 - TailwindCSS
+- Inertia.js
 
 ## Environment
 - Laravel Sail (Docker)
@@ -35,12 +36,15 @@ Follow this layering:
 
 Controllers → Services → Repositories → Models
 
+---
+
 ## Responsibilities
 
 ### Controllers
 - Handle HTTP requests
 - Validate input
-- Return JSON responses
+- Return Inertia responses
+- Handle redirects
 - Do NOT contain business logic
 
 ### Services
@@ -59,16 +63,180 @@ Controllers → Services → Repositories → Models
 
 ---
 
-# 📁 Frontend Architecture
+# ⚡ Inertia.js Rules (CRITICAL)
 
-pages → features → components → api
+This project uses Laravel with Inertia.js and React.
+
+---
+
+## Architecture Style
+
+This is NOT a REST API system.
+
+This is a server-driven SPA using Inertia.
+
+---
+
+## Routing Rules
+
+- Use routes in: web.php
+- Do NOT use /api routes
+- Do NOT create API controllers
+
+---
+
+## Controller Rules
+
+Controllers must:
+
+- Return Inertia::render()
+- Pass data as props
+- Handle redirects after actions
+
+---
+
+## Response Rules
+
+- Do NOT return JSON
+- Always use:
+  return Inertia::render('PageName', [...])
+
+---
+
+## Frontend Communication
+
+- Use Inertia forms or router
+- Do NOT use fetch/axios manually unless necessary
+
+---
+
+## Validation
+
+- Use Laravel validation
+- Errors are automatically handled by Inertia
+
+---
+
+## Auth Usage
+
+- Use auth()->user()
+- Share user globally if needed
+
+---
+
+# 🔐 Authentication System (CRITICAL)
+
+Authentication is already implemented using Laravel Fortify.
+
+---
 
 ## Rules
 
-- pages: route-level views
-- features: domain logic
-- components: reusable UI
-- api: HTTP communication layer
+- DO NOT recreate authentication logic
+- DO NOT generate login/register controllers
+- DO NOT duplicate Fortify flows
+- USE Fortify as the authentication backend
+
+---
+
+## Allowed Actions
+
+- Extend Fortify actions (CreateNewUser, etc.)
+- Add fields to users table if needed
+- Use:
+  - auth()->user()
+  - request()->user()
+
+---
+
+# 🐳 Docker Execution Rules (CRITICAL)
+
+The project uses Laravel Sail.
+
+---
+
+## 🚨 MANDATORY RULE
+
+ALL commands MUST be executed using:
+
+./vendor/bin/sail
+
+---
+
+## ✅ Correct Command Usage
+
+### PHP
+./vendor/bin/sail artisan migrate
+./vendor/bin/sail artisan make:model Team
+
+### Composer
+./vendor/bin/sail composer install
+
+### NPM
+./vendor/bin/sail npm install
+./vendor/bin/sail npm run dev
+
+### Tests
+./vendor/bin/sail artisan test
+
+---
+
+## ❌ FORBIDDEN
+
+- php artisan ...
+- composer ...
+- npm ...
+- node ...
+
+WITHOUT Sail prefix
+
+---
+
+## 🧠 Behavior Rule for AI
+
+- ALWAYS use Sail
+- NEVER assume host environment
+- NEVER omit Sail prefix
+
+---
+
+## 🧪 Command Output Rule
+
+- Output ONLY the command
+- Do NOT explain
+
+---
+
+## 🛑 Safety Rule
+
+If a command is about to run without Sail:
+
+👉 STOP and correct it
+
+---
+
+# 🧱 Database Design Rules
+
+- Use foreign keys in all relationships
+- Use cascading deletes where appropriate
+- Use indexes for foreign keys
+- Use snake_case naming
+
+---
+
+# 🧩 Multi-Tenancy Rule (CRITICAL)
+
+This is a team-based system.
+
+---
+
+## Rules
+
+- A user can belong to multiple teams
+- A team can have multiple users
+- All data MUST be scoped to a team
+
+👉 NEVER expose data across teams
 
 ---
 
@@ -85,65 +253,17 @@ pages → features → components → api
 
 ---
 
-# 🔐 Authentication System (CRITICAL)
+# 📁 Frontend Architecture
 
-Authentication is already implemented using Laravel Fortify.
-
-## Rules
-
-- DO NOT recreate authentication logic
-- DO NOT generate login/register controllers
-- DO NOT duplicate Fortify flows
-- USE Fortify as the authentication backend
-
-## Allowed Actions
-
-- Extend Fortify actions (CreateNewUser, etc.)
-- Add fields to users table if needed
-- Use authenticated user via:
-  - auth()->user()
-  - request()->user()
-
-## API Authentication
-
-- Use Sanctum (if needed for API tokens)
-- Protect routes with auth middleware
+pages → features → components
 
 ---
 
-# 🐳 Environment Rules
-
-The project uses Laravel Sail.
-
 ## Rules
 
-- Assume Docker environment is running
-- Do NOT generate non-Docker setup steps
-- Use environment variables properly (.env)
-- Do NOT hardcode credentials
-
----
-
-# 🧱 Database Design Rules
-
-- Use foreign keys in all relationships
-- Use cascading deletes where appropriate
-- Use indexes for foreign keys
-- Use snake_case naming
-
----
-
-# 🧩 Multi-Tenancy Rule (IMPORTANT)
-
-This is a team-based system.
-
-## Rules
-
-- A user can belong to multiple teams
-- A team can have multiple users
-- All data must be scoped to a team
-
-👉 NEVER expose data across teams
+- pages: route-level views
+- features: domain logic
+- components: reusable UI
 
 ---
 
@@ -158,25 +278,79 @@ This is a team-based system.
 
 ---
 
-# 🧪 Output Rules (VERY IMPORTANT)
+# 🤖 AI Behavior Rules (Cursor + Boost)
 
-When generating code:
+This project uses AI-assisted development.
 
-- ONLY generate what is requested
-- DO NOT explain unless asked
-- DO NOT generate extra files
-- KEEP responses minimal
-- FOLLOW existing architecture
+---
+
+## Core Rule
+
+AI MUST follow project architecture strictly.
+
+---
+
+## Architecture Enforcement
+
+- Follow:
+  Controllers → Services → Repositories → Models
+
+- Do NOT skip layers
+- Do NOT place business logic in controllers
+- Do NOT query database from controllers
+
+---
+
+## Inertia Enforcement
+
+- Always use Inertia
+- Do NOT generate API endpoints
+- Do NOT use /api routes
+- Do NOT return JSON
+
+---
+
+## Docker Enforcement
+
+- ALL commands must use:
+  ./vendor/bin/sail
+
+---
+
+## Code Generation Rules
+
+- Respect existing structure
+- Extend existing files when appropriate
+- Do NOT duplicate logic
+- Do NOT overwrite working code unless asked
+
+---
+
+## Safety Rules
+
+Before generating code:
+
+1. Check existing implementation
+2. Avoid duplication
+3. Follow current phase
+
+---
+
+## Output Style
+
+- Keep output minimal
+- Generate only requested code
+- No explanations unless asked
 
 ---
 
 # 🚀 Development Strategy
 
-Build the system in phases:
+Build in phases:
 
-1. Teams (since auth already exists)
+1. Teams
 2. Projects
-3. Kanban Board (Columns)
+3. Kanban (Columns)
 4. Tasks
 5. Comments
 6. Activity Log
@@ -185,7 +359,7 @@ Build the system in phases:
 
 # 📌 Current Phase
 
-If not specified, assume:
+If not specified:
 
 👉 Phase 1: Teams
 
@@ -210,25 +384,9 @@ If not specified, assume:
 
 ---
 
-# 🧠 Backend Guidelines
-
-- Use Service classes for logic
-- Use Repository classes for DB access
-- Controllers should be thin
-
----
-
-# 🧠 Frontend Guidelines
-
-- Use feature-based structure
-- Keep UI components reusable
-- Separate API calls
-
----
-
 # ⚠️ Constraints
 
-- This is an MVP
+- MVP only
 - No overengineering
 - No microservices
 - No unnecessary abstractions
@@ -245,87 +403,3 @@ Focus on:
 - scalability
 - clean architecture
 - maintainability
-
----
-
-# 🐳 Docker Execution Rules (CRITICAL)
-
-The project uses Laravel Sail.
-
-## 🚨 MANDATORY RULE
-
-ALL commands MUST be executed inside the Docker container using Sail.
-
-## ✅ Correct Command Usage
-
-Always prefix commands with:
-
-./vendor/bin/sail
-
-### Examples
-
-- PHP commands:
-  ./vendor/bin/sail artisan migrate
-  ./vendor/bin/sail artisan make:model Team
-
-- Composer:
-  ./vendor/bin/sail composer install
-
-- NPM:
-  ./vendor/bin/sail npm install
-  ./vendor/bin/sail npm run dev
-
-- Tests:
-  ./vendor/bin/sail artisan test
-
----
-
-## ❌ FORBIDDEN
-
-- Running commands directly on host machine
-- Using:
-  - php artisan ...
-  - composer ...
-  - npm ...
-  - node ...
-
-WITHOUT Sail prefix
-
----
-
-## 🧠 Behavior Rule for AI
-
-When suggesting or generating commands:
-
-- ALWAYS use Sail
-- NEVER assume host environment
-- NEVER omit the Sail prefix
-
----
-
-## ⚠️ Reason
-
-Host machine and Docker container have different:
-
-- PHP versions
-- Node versions
-- Dependencies
-- Database connections
-
-Running commands outside Docker will break the system.
-
----
-
-## 🧪 Command Output Rule
-
-When generating commands:
-
-- Output ONLY the command
-- Do not explain
-- Do not wrap in paragraphs
-
-## 🛑 Safety Rule
-
-If a command is about to be executed without Sail:
-
-👉 STOP and correct it before responding
