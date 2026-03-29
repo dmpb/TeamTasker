@@ -211,7 +211,7 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 
 ### Phase 3 — Kanban: columnas
 
-#### Phase 3.A – Backend Foundation
+#### Phase 3.A – Backend Foundation ✅ *Completada*
 
 **Objetivo:** Columnas ordenadas por proyecto.
 
@@ -221,11 +221,13 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 - Modelo `Column`; relación con `Project`.  
 - `ColumnRepository` + `ColumnService`: listar ordenado, crear, actualizar, reordenar en transacción si aplica.
 
+**Implementado:** Tabla **`board_columns`** (evita el identificador reservado `columns` en SQL), FK `project_id` → `projects` con `cascadeOnDelete`, `UNIQUE (project_id, position)`; modelo `Column` con `#[Fillable]` y `Project::boardColumns()`; `ColumnRepository` (listado por `position`, crear con posición al final si omite, actualizar nombre, reordenar en `DB::transaction` con fase intermedia de offsets); `ColumnService` como fachada; `ColumnFactory` con `forProject` / `atPosition`; Pest en `ColumnRepositoryTest` y `ColumnServiceTest` (orden, reorden, validación de pertenencia, cascade).
+
 **Criterios de cierre:** Tests de servicio/repositorio para orden y pertenencia a proyecto.
 
 ---
 
-#### Phase 3.B – Application Layer
+#### Phase 3.B – Application Layer ✅ *Completada*
 
 **Objetivo:** Exponer columnas vía Inertia.
 
@@ -235,11 +237,13 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 - Acciones: crear/editar/eliminar columna, reordenar (sin JSON para el flujo principal de la SPA).  
 - Pest: permisos y consistencia de `project_id`.
 
+**Implementado:** `ColumnController` con `board` (Inertia `teams/projects/board`), `store` / `update` / `destroy` / `reorder` (POST con `column_ids[]`); rutas bajo `teams/{team}/projects/{project}` con `scopeBindings()`; `ColumnPolicy` delegando en `ProjectPolicy::update` (misma regla que gestionar proyectos); `StoreColumnRequest`, `UpdateColumnRequest`, `ReorderColumnsRequest` con `team_id`/`project_id` coherentes; `Project::columns()` como alias de `boardColumns()` para binding anidado `{column}`; `deleteColumn` en repositorio/servicio; página React mínima del tablero; Wayfinder regenerado (`--with-form`); Pest en `ColumnControllerTest` (invitado, miembro, owner, 404 cruzado, validación).
+
 **Criterios de cierre:** Inertia o redirects; tests verdes.
 
 ---
 
-#### Phase 3.C – Frontend Integration
+#### Phase 3.C – Frontend Integration ✅ *Completada*
 
 **Objetivo:** Vista tablero mínima.
 
@@ -247,6 +251,8 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 
 - Página tablero: columnas en UI.  
 - Formularios Inertia para alta/edición; reordenar solo si MVP lo exige (si no, acciones simples vía POST).
+
+**Implementado:** `teams/projects/board`: columnas en tarjetas horizontales (scroll); `Form` Wayfinder para alta (`ColumnController.store`), renombrar (`update`) y borrar (`destroy` con confirm); reordenación con botones izquierda/derecha vía `router.post` a `reorder` y `column_ids`; miembros sin permiso ven columnas sin acciones; enlace al tablero desde el nombre del proyecto en `teams/projects/index`; copy de archivo en fase posterior para tareas.
 
 **Criterios de cierre:** Usuario gestiona columnas dentro del flujo Inertia.
 

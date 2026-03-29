@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ColumnController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\TeamController;
 use Illuminate\Support\Facades\Route;
@@ -26,6 +27,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('teams/{team}/projects/{project}/archive', [ProjectController::class, 'archive'])->name('teams.projects.archive');
         Route::post('teams/{team}/projects/{project}/unarchive', [ProjectController::class, 'unarchive'])->name('teams.projects.unarchive');
         Route::delete('teams/{team}/projects/{project}', [ProjectController::class, 'destroy'])->name('teams.projects.destroy');
+
+        Route::get('teams/{team}/projects/{project}/board', [ColumnController::class, 'board'])->name('teams.projects.board');
+        Route::post('teams/{team}/projects/{project}/columns/reorder', [ColumnController::class, 'reorder'])->name('teams.projects.columns.reorder');
+        Route::post('teams/{team}/projects/{project}/columns', [ColumnController::class, 'store'])->name('teams.projects.columns.store');
+        Route::patch('teams/{team}/projects/{project}/columns/{column}', [ColumnController::class, 'update'])->name('teams.projects.columns.update');
+        Route::delete('teams/{team}/projects/{project}/columns/{column}', [ColumnController::class, 'destroy'])->name('teams.projects.columns.destroy');
     });
 });
 

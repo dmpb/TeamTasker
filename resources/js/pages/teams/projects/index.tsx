@@ -9,7 +9,10 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import AppLayout from '@/layouts/app-layout';
 import { index as teamsIndex, show as teamsShow } from '@/routes/teams';
-import { index as teamProjectsIndex } from '@/routes/teams/projects';
+import {
+    board as projectBoard,
+    index as teamProjectsIndex,
+} from '@/routes/teams/projects';
 import type { BreadcrumbItem } from '@/types';
 
 type ProjectRow = {
@@ -161,10 +164,16 @@ export default function TeamProjectsIndex() {
                                     key={row.id}
                                     className="flex flex-col gap-3 px-3 py-3 lg:flex-row lg:items-start lg:justify-between"
                                 >
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-sm font-medium">
+                                    <div className="min-w-0 flex-1 space-y-1">
+                                        <Link
+                                            href={projectBoard.url({
+                                                team: team.id,
+                                                project: row.id,
+                                            })}
+                                            className="text-sm font-medium text-foreground underline-offset-4 hover:underline"
+                                        >
                                             {row.name}
-                                        </p>
+                                        </Link>
                                         {row.archived_at && (
                                             <p className="text-xs text-muted-foreground">
                                                 Archived
