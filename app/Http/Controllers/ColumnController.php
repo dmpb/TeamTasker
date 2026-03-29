@@ -7,9 +7,11 @@ use App\Http\Requests\StoreColumnRequest;
 use App\Http\Requests\UpdateColumnRequest;
 use App\Models\Column;
 use App\Models\Project;
+use App\Models\Task;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\ColumnService;
+use App\Services\TaskService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -17,7 +19,10 @@ use Inertia\Response;
 
 class ColumnController extends Controller
 {
-    public function __construct(protected ColumnService $columnService) {}
+    public function __construct(
+        protected ColumnService $columnService,
+        protected TaskService $taskService,
+    ) {}
 
     public function board(Request $request, Team $team, Project $project): Response
     {
@@ -28,7 +33,9 @@ class ColumnController extends Controller
         /** @var User|null $user */
         $user = $request->user();
 
-        $columns = $this->columnService->listProjectColumns($project);
+        $columns = $this->taskService->boardColumnsWithTasks($project);
+
+        $canManageTasks = $user?->can('update', $project) ?? false;
 
         return Inertia::render('teams/projects/board', [
             'team' => $team->only(['id', 'name', 'owner_id']),
@@ -42,12 +49,52 @@ class ColumnController extends Controller
                     'id' => $column->id,
                     'name' => $column->name,
                     'position' => $column->position,
+                    'tasks' => $column->tasks->map(static function (Task $task): array {
+                        return [
+                            'id' => $task->id,
+                            'title' => $task->title,
+                            'description' => $task->description,
+                            'position' => $task->position,
+                            'assignee' => $task->assignee_id === null || $task->assignee === null
+                                ? null
+                                : [
+                                    'id' => $task->assignee->id,
+                                    'name' => $task->assignee->name,
+                                ],
+                        ];
+                    })->values()->all(),
                 ];
             })->values()->all(),
+            'assignableUsers' => $canManageTasks
+                ? $this->assignableUsersForTeam($team)
+                : [],
             'can' => [
                 'manageColumns' => $user?->can('update', $project) ?? false,
+                'manageTasks' => $canManageTasks,
             ],
         ]);
+    }
+
+    /**
+     * @return list<array{id: int, name: string}>
+     */
+    private function assignableUsersForTeam(Team $team): array
+    {
+        $ids = collect([$team->owner_id])
+            ->merge($team->members()->pluck('user_id'))
+            ->unique()
+            ->values();
+
+        return User::query()
+            ->whereIn('id', $ids)
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(static fn (User $u): array => [
+                'id' => $u->id,
+                'name' => $u->name,
+            ])
+            ->values()
+            ->all();
     }
 
     public function store(StoreColumnRequest $request, Team $team, Project $project): RedirectResponse

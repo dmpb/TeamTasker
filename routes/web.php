@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Controllers\ColumnController;
+use App\Http\Controllers\CommentController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TeamController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
@@ -30,9 +32,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::get('teams/{team}/projects/{project}/board', [ColumnController::class, 'board'])->name('teams.projects.board');
         Route::post('teams/{team}/projects/{project}/columns/reorder', [ColumnController::class, 'reorder'])->name('teams.projects.columns.reorder');
+        Route::post('teams/{team}/projects/{project}/columns/{column}/tasks', [TaskController::class, 'store'])->name('teams.projects.columns.tasks.store');
         Route::post('teams/{team}/projects/{project}/columns', [ColumnController::class, 'store'])->name('teams.projects.columns.store');
         Route::patch('teams/{team}/projects/{project}/columns/{column}', [ColumnController::class, 'update'])->name('teams.projects.columns.update');
         Route::delete('teams/{team}/projects/{project}/columns/{column}', [ColumnController::class, 'destroy'])->name('teams.projects.columns.destroy');
+        Route::patch('teams/{team}/projects/{project}/tasks/{task}', [TaskController::class, 'update'])->name('teams.projects.tasks.update');
+        Route::post('teams/{team}/projects/{project}/tasks/{task}/move', [TaskController::class, 'move'])->name('teams.projects.tasks.move');
+        Route::delete('teams/{team}/projects/{project}/tasks/{task}', [TaskController::class, 'destroy'])->name('teams.projects.tasks.destroy');
+
+        Route::get('teams/{team}/projects/{project}/tasks/{task}/comments', [CommentController::class, 'index'])->name('teams.projects.tasks.comments.index');
+        Route::post('teams/{team}/projects/{project}/tasks/{task}/comments', [CommentController::class, 'store'])->name('teams.projects.tasks.comments.store');
+        Route::patch('teams/{team}/projects/{project}/tasks/{task}/comments/{comment}', [CommentController::class, 'update'])->name('teams.projects.tasks.comments.update');
+        Route::delete('teams/{team}/projects/{project}/tasks/{task}/comments/{comment}', [CommentController::class, 'destroy'])->name('teams.projects.tasks.comments.destroy');
     });
 });
 

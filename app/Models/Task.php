@@ -2,23 +2,18 @@
 
 namespace App\Models;
 
-use Database\Factories\ColumnFactory;
+use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['project_id', 'name', 'position'])]
-class Column extends Model
+#[Fillable(['project_id', 'column_id', 'assignee_id', 'title', 'description', 'position'])]
+class Task extends Model
 {
-    /** @use HasFactory<ColumnFactory> */
+    /** @use HasFactory<TaskFactory> */
     use HasFactory;
-
-    /**
-     * @var string
-     */
-    protected $table = 'board_columns';
 
     /**
      * @return array<string, string>
@@ -35,11 +30,21 @@ class Column extends Model
         return $this->belongsTo(Project::class);
     }
 
-    /**
-     * @return HasMany<Task, $this>
-     */
-    public function tasks(): HasMany
+    public function column(): BelongsTo
     {
-        return $this->hasMany(Task::class, 'column_id');
+        return $this->belongsTo(Column::class, 'column_id');
+    }
+
+    public function assignee(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assignee_id');
+    }
+
+    /**
+     * @return HasMany<Comment, $this>
+     */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(Comment::class);
     }
 }

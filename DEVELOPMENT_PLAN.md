@@ -260,7 +260,7 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 
 ### Phase 4 — Tasks
 
-#### Phase 4.A – Backend Foundation
+#### Phase 4.A – Backend Foundation ✅ *Completada*
 
 **Objetivo:** Tarjetas ligadas a columna y proyecto.
 
@@ -270,11 +270,13 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 - Modelo `Task`; relaciones con `Column` / `Project`.  
 - `TaskRepository` + `TaskService`: crear, actualizar, mover entre columnas **del mismo proyecto**; plan de eager loading para tablero.
 
+**Implementado:** Tabla `tasks` con `project_id` / `column_id` / `assignee_id` (nullable, `nullOnDelete` en `users`), `title`, `description`, `position`, `UNIQUE (column_id, position)`, cascadas al borrar proyecto o columna; modelo `Task` con `project()`, `column()`, `assignee()`; `Column::tasks()`, `Project::tasks()`, `User::assignedTasks()`; `TaskRepository` (`listColumnsWithTasksOrderedForProject` con `with('tasks')` ordenado, `createTask` validando columna del proyecto, `updateTask`, `moveTaskToColumn` en transacción con `InvalidArgumentException` si el proyecto de la columna destino difiere); `TaskService` con `boardColumnsWithTasks`; `TaskFactory` (`forColumn`, `atPosition`); Pest en `TaskRepositoryTest` y `TaskServiceTest`.
+
 **Criterios de cierre:** Tests de mover tarea y rechazo de columnas de otro proyecto.
 
 ---
 
-#### Phase 4.B – Application Layer
+#### Phase 4.B – Application Layer ✅ *Completada*
 
 **Objetivo:** Acciones HTTP para tareas.
 
@@ -284,11 +286,13 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 - Props Inertia para tablero: estructura que minimice N+1.  
 - Pest: flujos autorizados y límites multi-tenant.
 
+**Implementado:** `TaskPolicy` (`create` sobre columna, `update`/`delete` sobre tarea vía permiso de proyecto); rutas anidadas `POST …/columns/{column}/tasks`, `PATCH …/tasks/{task}`, `POST …/tasks/{task}/move`, `DELETE …/tasks/{task}` con binding `{task}` bajo proyecto; `StoreTaskRequest` / `UpdateTaskRequest` / `MoveTaskRequest` (asignado debe ser dueño o miembro del equipo del proyecto; columna destino del mismo proyecto); `TaskController`; tablero Inertia vía `TaskService::boardColumnsWithTasks` + `tasks.assignee` en eager load; `can.manageTasks`; UI mínima en `board` (alta, mover con `<select>`, borrar; edición vía PATCH cubierta en tests); Wayfinder regenerado; Pest en `TaskControllerTest` y ajustes en `ColumnControllerTest`.
+
 **Criterios de cierre:** Uso normal del tablero sin API JSON obligatoria.
 
 ---
 
-#### Phase 4.C – Frontend Integration
+#### Phase 4.C – Frontend Integration ✅ *Completada*
 
 **Objetivo:** Tarjetas visibles por columna.
 
@@ -297,13 +301,15 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 - Render de tareas por columna en la vista tablero.  
 - Formularios Inertia crear/editar; acción mover según contrato del backend.
 
+**Implementado:** `ColumnController::board` expone `assignableUsers` (owner + miembros del equipo, solo si `manageTasks`); `board.tsx`: tarjetas con vista lectura para miembros; con `manageTasks`, formulario **PATCH** por tarea (título, descripción, asignado con `InputError`), **POST** alta con descripción y asignado opcionales, mover y borrar; estilos alineados con inputs; Pest: `assignableUsers` en Inertia (owner vs miembro), validación `title` en update.
+
 **Criterios de cierre:** Crear/mover/editar tarea desde UI con feedback Inertia.
 
 ---
 
 ### Phase 5 — Comments
 
-#### Phase 5.A – Backend Foundation
+#### Phase 5.A – Backend Foundation ✅ *Completada*
 
 **Objetivo:** Comentarios atados a tarea.
 
@@ -313,11 +319,13 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 - Modelo `Comment`; relaciones.  
 - `CommentRepository` + `CommentService`: listar por tarea, crear, (editar/borrar si MVP).
 
+**Implementado:** Migración `comments` con `task_id` / `user_id` / `body` + FKs con `cascadeOnDelete`; modelo `Comment` con `task()` y `user()`; relaciones inversas `Task::comments()` y `User::comments()`; `CommentRepository` (listar por tarea con `user`, crear, actualizar, borrar) y `CommentService`; `CommentFactory` con estados `forTask`/`byUser`; tests en `CommentRepositoryTest` y `CommentServiceTest`.
+
 **Criterios de cierre:** Tests de servicio con tarea en proyecto de equipo conocido.
 
 ---
 
-#### Phase 5.B – Application Layer
+#### Phase 5.B – Application Layer ✅ *Completada*
 
 **Objetivo:** Rutas Inertia para comentarios.
 
@@ -327,11 +335,13 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 - Controlador + policy (cadena task → project → team).  
 - Pest: usuario ajeno no lista/crea comentarios en tarea de otro equipo.
 
+**Implementado:** `TaskPolicy::view` (listar comentarios vía vista de proyecto); `CommentPolicy` (`create` sobre `Task`, `view`/`update`/`delete` sobre `Comment` con cadena task → project → team); rutas anidadas `GET|POST …/tasks/{task}/comments`, `PATCH|DELETE …/comments/{comment}` con `scopeBindings`; `StoreCommentRequest` / `UpdateCommentRequest`; `CommentController` (index Inertia `teams/projects/tasks/comments`, store/update/destroy con redirects); página Inertia mínima para listado; Wayfinder regenerado; Pest en `CommentControllerTest` (invitado, otro equipo, miembro, validación, 404 por tarea/comentario incoherente, edición autor vs miembro).
+
 **Criterios de cierre:** Comportamiento servidor completo sin depender de UI.
 
 ---
 
-#### Phase 5.C – Frontend Integration
+#### Phase 5.C – Frontend Integration ✅ *Completada*
 
 **Objetivo:** UX de comentarios en ficha de tarea.
 
@@ -339,6 +349,8 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 
 - Sección comentarios en página de tarea (o patrón equivalente del proyecto).  
 - Formulario crear; lista con autor y fecha.
+
+**Implementado:** `teams/projects/tasks/comments.tsx` evolucionada a ficha de tarea con UX de comentarios (alta con `<Form>`, listado con autor + fecha formateada, estado vacío, edición y borrado cuando hay permiso, errores de validación visibles con `InputError`); enlace **Comments** desde cada tarjeta en `teams/projects/board.tsx`; `CommentController::index` ahora expone permisos (`can.createComments` y `comments[].can.update|delete`) para render condicional seguro en frontend; tests de controlador actualizados para validar nuevos props Inertia de permisos.
 
 **Criterios de cierre:** Flujo feliz + errores de validación visibles.
 

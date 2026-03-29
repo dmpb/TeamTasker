@@ -42,4 +42,22 @@ class User extends Authenticatable
     {
         return $this->hasMany(TeamMember::class);
     }
+
+    /**
+     * Tasks assigned to this user (optional Kanban assignee).
+     *
+     * @return HasMany<Task, $this>
+     */
+    public function assignedTasks(): HasMany
+    {
+        return $this->hasMany(Task::class, 'assignee_id');
+    }
+
+    /**
+     * @return HasMany<Comment, $this>
+     */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(Comment::class);
+    }
 }

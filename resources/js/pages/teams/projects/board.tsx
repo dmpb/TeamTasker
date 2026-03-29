@@ -7,21 +7,44 @@ import {
 } from '@inertiajs/react';
 import { ChevronLeft, ChevronRight, LayoutGrid, Trash2 } from 'lucide-react';
 import ColumnController from '@/actions/App/Http/Controllers/ColumnController';
+import TaskController from '@/actions/App/Http/Controllers/TaskController';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { cn } from '@/lib/utils';
 import AppLayout from '@/layouts/app-layout';
 import { index as teamsIndex, show as teamsShow } from '@/routes/teams';
 import { board as projectBoard, index as teamProjectsIndex } from '@/routes/teams/projects';
+import { index as taskCommentsIndex } from '@/routes/teams/projects/tasks/comments/index';
 import type { BreadcrumbItem } from '@/types';
+
+const textareaClass = cn(
+    'border-input placeholder:text-muted-foreground flex min-h-[4rem] w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none',
+    'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
+    'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
+);
+
+type TaskRow = {
+    id: number;
+    title: string;
+    description: string | null;
+    position: number;
+    assignee: { id: number; name: string } | null;
+};
 
 type ColumnRow = {
     id: number;
     name: string;
     position: number;
+    tasks: TaskRow[];
+};
+
+type AssignableUser = {
+    id: number;
+    name: string;
 };
 
 type ProjectBoardPageProps = {
@@ -36,8 +59,10 @@ type ProjectBoardPageProps = {
         archived_at: string | null;
     };
     columns: ColumnRow[];
+    assignableUsers: AssignableUser[];
     can: {
         manageColumns: boolean;
+        manageTasks: boolean;
     };
 };
 
@@ -54,7 +79,7 @@ function swapColumnOrder(ids: number[], index: number, direction: -1 | 1): numbe
 
 export default function ProjectBoard() {
     const page = usePage<ProjectBoardPageProps>();
-    const { team, project, columns, can } = page.props;
+    const { team, project, columns, assignableUsers, can } = page.props;
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Teams', href: teamsIndex() },
@@ -81,6 +106,9 @@ export default function ProjectBoard() {
             { preserveScroll: true },
         );
     };
+
+    const otherColumns = (columnId: number): ColumnRow[] =>
+        columns.filter((c) => c.id !== columnId);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -168,7 +196,7 @@ export default function ProjectBoard() {
                             {columns.map((col, index) => (
                                 <article
                                     key={col.id}
-                                    className="flex w-72 shrink-0 flex-col rounded-lg border border-sidebar-border/70 bg-card shadow-sm dark:border-sidebar-border"
+                                    className="flex w-80 shrink-0 flex-col rounded-lg border border-sidebar-border/70 bg-card shadow-sm dark:border-sidebar-border"
                                 >
                                     <div className="border-b border-border px-4 py-3">
                                         <div className="flex items-start justify-between gap-2">
@@ -181,7 +209,424 @@ export default function ProjectBoard() {
                                         </div>
                                     </div>
 
-                                    {can.manageColumns ? (
+                                    <div className="flex flex-1 flex-col border-b border-border">
+                                        {col.tasks.length === 0 ? (
+                                            <p className="p-3 text-xs text-muted-foreground">
+                                                No tasks in this column.
+                                            </p>
+                                        ) : (
+                                            <ul className="max-h-112 space-y-3 overflow-y-auto p-3">
+                                                {col.tasks.map((task) => (
+                                                    <li
+                                                        key={task.id}
+                                                        className="rounded-md border border-border/60 bg-muted/40 p-2.5 text-sm dark:bg-muted/20"
+                                                    >
+                                                        <div className="mb-2 flex justify-end">
+                                                            <Link
+                                                                href={taskCommentsIndex.url({
+                                                                    team: team.id,
+                                                                    project: project.id,
+                                                                    task: task.id,
+                                                                })}
+                                                                className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+                                                            >
+                                                                Comments
+                                                            </Link>
+                                                        </div>
+                                                        {can.manageTasks ? (
+                                                            <div className="flex flex-col gap-3">
+                                                                <Form
+                                                                    {...TaskController.update.form(
+                                                                        {
+                                                                            team: team.id,
+                                                                            project:
+                                                                                project.id,
+                                                                            task: task.id,
+                                                                        },
+                                                                    )}
+                                                                    options={{
+                                                                        preserveScroll:
+                                                                            true,
+                                                                    }}
+                                                                    className="space-y-2"
+                                                                >
+                                                                    {({
+                                                                        processing,
+                                                                        errors: ue,
+                                                                    }) => (
+                                                                        <>
+                                                                            <div className="grid gap-1">
+                                                                                <Label
+                                                                                    className="text-xs"
+                                                                                    htmlFor={`task-title-${task.id}`}
+                                                                                >
+                                                                                    Title
+                                                                                </Label>
+                                                                                <Input
+                                                                                    id={`task-title-${task.id}`}
+                                                                                    name="title"
+                                                                                    required
+                                                                                    maxLength={
+                                                                                        255
+                                                                                    }
+                                                                                    defaultValue={
+                                                                                        task.title
+                                                                                    }
+                                                                                    className="text-sm"
+                                                                                />
+                                                                                <InputError
+                                                                                    message={
+                                                                                        ue.title
+                                                                                    }
+                                                                                />
+                                                                            </div>
+                                                                            <div className="grid gap-1">
+                                                                                <Label
+                                                                                    className="text-xs"
+                                                                                    htmlFor={`task-desc-${task.id}`}
+                                                                                >
+                                                                                    Description
+                                                                                </Label>
+                                                                                <textarea
+                                                                                    id={`task-desc-${task.id}`}
+                                                                                    name="description"
+                                                                                    rows={
+                                                                                        2
+                                                                                    }
+                                                                                    defaultValue={
+                                                                                        task.description ??
+                                                                                        ''
+                                                                                    }
+                                                                                    className={
+                                                                                        textareaClass
+                                                                                    }
+                                                                                    placeholder="Optional"
+                                                                                />
+                                                                                <InputError
+                                                                                    message={
+                                                                                        ue.description
+                                                                                    }
+                                                                                />
+                                                                            </div>
+                                                                            <div className="grid gap-1">
+                                                                                <Label
+                                                                                    className="text-xs"
+                                                                                    htmlFor={`task-assignee-${task.id}`}
+                                                                                >
+                                                                                    Assignee
+                                                                                </Label>
+                                                                                <select
+                                                                                    id={`task-assignee-${task.id}`}
+                                                                                    name="assignee_id"
+                                                                                    defaultValue={
+                                                                                        task.assignee?.id?.toString() ??
+                                                                                        ''
+                                                                                    }
+                                                                                    className="border-input bg-background h-9 w-full rounded-md border px-2 text-xs"
+                                                                                >
+                                                                                    <option value="">
+                                                                                        Unassigned
+                                                                                    </option>
+                                                                                    {assignableUsers.map(
+                                                                                        (
+                                                                                            u,
+                                                                                        ) => (
+                                                                                            <option
+                                                                                                key={
+                                                                                                    u.id
+                                                                                                }
+                                                                                                value={
+                                                                                                    u.id
+                                                                                                }
+                                                                                            >
+                                                                                                {
+                                                                                                    u.name
+                                                                                                }
+                                                                                            </option>
+                                                                                        ),
+                                                                                    )}
+                                                                                </select>
+                                                                                <InputError
+                                                                                    message={
+                                                                                        ue.assignee_id
+                                                                                    }
+                                                                                />
+                                                                            </div>
+                                                                            <Button
+                                                                                type="submit"
+                                                                                size="sm"
+                                                                                variant="secondary"
+                                                                                disabled={
+                                                                                    processing
+                                                                                }
+                                                                                className="w-full"
+                                                                            >
+                                                                                {processing && (
+                                                                                    <Spinner />
+                                                                                )}
+                                                                                Save task
+                                                                            </Button>
+                                                                        </>
+                                                                    )}
+                                                                </Form>
+
+                                                                {otherColumns(col.id)
+                                                                    .length > 0 && (
+                                                                    <Form
+                                                                        {...TaskController.move.form(
+                                                                            {
+                                                                                team: team.id,
+                                                                                project:
+                                                                                    project.id,
+                                                                                task: task.id,
+                                                                            },
+                                                                        )}
+                                                                        options={{
+                                                                            preserveScroll:
+                                                                                true,
+                                                                        }}
+                                                                        className="flex flex-col gap-1 border-t border-border/60 pt-2"
+                                                                    >
+                                                                        {({
+                                                                            processing,
+                                                                            errors: moveErrors,
+                                                                        }) => (
+                                                                            <>
+                                                                                <Label
+                                                                                    className="text-xs text-muted-foreground"
+                                                                                    htmlFor={`move-task-${task.id}`}
+                                                                                >
+                                                                                    Move column
+                                                                                </Label>
+                                                                                <select
+                                                                                    id={`move-task-${task.id}`}
+                                                                                    name="target_column_id"
+                                                                                    required
+                                                                                    defaultValue=""
+                                                                                    className="border-input bg-background h-9 w-full rounded-md border px-2 text-xs"
+                                                                                >
+                                                                                    <option
+                                                                                        value=""
+                                                                                        disabled
+                                                                                    >
+                                                                                        Move to…
+                                                                                    </option>
+                                                                                    {otherColumns(
+                                                                                        col.id,
+                                                                                    ).map(
+                                                                                        (
+                                                                                            c,
+                                                                                        ) => (
+                                                                                            <option
+                                                                                                key={
+                                                                                                    c.id
+                                                                                                }
+                                                                                                value={
+                                                                                                    c.id
+                                                                                                }
+                                                                                            >
+                                                                                                {
+                                                                                                    c.name
+                                                                                                }
+                                                                                            </option>
+                                                                                        ),
+                                                                                    )}
+                                                                                </select>
+                                                                                <InputError
+                                                                                    message={
+                                                                                        moveErrors.target_column_id
+                                                                                    }
+                                                                                />
+                                                                                <Button
+                                                                                    type="submit"
+                                                                                    size="sm"
+                                                                                    variant="outline"
+                                                                                    disabled={
+                                                                                        processing
+                                                                                    }
+                                                                                >
+                                                                                    {processing && (
+                                                                                        <Spinner />
+                                                                                    )}
+                                                                                    Move
+                                                                                </Button>
+                                                                            </>
+                                                                        )}
+                                                                    </Form>
+                                                                )}
+                                                                <Form
+                                                                    {...TaskController.destroy.form(
+                                                                        {
+                                                                            team: team.id,
+                                                                            project:
+                                                                                project.id,
+                                                                            task: task.id,
+                                                                        },
+                                                                    )}
+                                                                    options={{
+                                                                        preserveScroll:
+                                                                            true,
+                                                                    }}
+                                                                    onBefore={() =>
+                                                                        window.confirm(
+                                                                            `Delete task “${task.title}”?`,
+                                                                        )
+                                                                    }
+                                                                    className="border-t border-border/60 pt-2"
+                                                                >
+                                                                    {({
+                                                                        processing,
+                                                                    }) => (
+                                                                        <Button
+                                                                            type="submit"
+                                                                            size="sm"
+                                                                            variant="destructive"
+                                                                            disabled={
+                                                                                processing
+                                                                            }
+                                                                            className="w-full gap-1"
+                                                                        >
+                                                                            {processing && (
+                                                                                <Spinner />
+                                                                            )}
+                                                                            <Trash2
+                                                                                className="size-3.5"
+                                                                                aria-hidden
+                                                                            />
+                                                                            Delete task
+                                                                        </Button>
+                                                                    )}
+                                                                </Form>
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <p className="font-medium leading-snug">
+                                                                    {task.title}
+                                                                </p>
+                                                                {task.description && (
+                                                                    <p className="mt-1 text-xs text-muted-foreground">
+                                                                        {task.description}
+                                                                    </p>
+                                                                )}
+                                                                {task.assignee && (
+                                                                    <p className="mt-1 text-xs text-muted-foreground">
+                                                                        {task.assignee.name}
+                                                                    </p>
+                                                                )}
+                                                            </>
+                                                        )}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </div>
+
+                                    {can.manageTasks && (
+                                        <div className="border-b border-border p-3">
+                                            <p className="mb-2 text-xs font-medium text-muted-foreground">
+                                                New task
+                                            </p>
+                                            <Form
+                                                {...TaskController.store.form({
+                                                    team: team.id,
+                                                    project: project.id,
+                                                    column: col.id,
+                                                })}
+                                                options={{
+                                                    preserveScroll: true,
+                                                }}
+                                                resetOnSuccess={[
+                                                    'title',
+                                                    'description',
+                                                ]}
+                                                className="space-y-2"
+                                            >
+                                                {({ processing, errors: te }) => (
+                                                    <>
+                                                        <div className="grid gap-1">
+                                                            <Label
+                                                                className="sr-only"
+                                                                htmlFor={`new-task-title-${col.id}`}
+                                                            >
+                                                                Title
+                                                            </Label>
+                                                            <Input
+                                                                id={`new-task-title-${col.id}`}
+                                                                name="title"
+                                                                required
+                                                                maxLength={255}
+                                                                placeholder="Title"
+                                                                className="text-sm"
+                                                            />
+                                                            <InputError
+                                                                message={te.title}
+                                                            />
+                                                        </div>
+                                                        <div className="grid gap-1">
+                                                            <Label
+                                                                className="sr-only"
+                                                                htmlFor={`new-task-desc-${col.id}`}
+                                                            >
+                                                                Description
+                                                            </Label>
+                                                            <textarea
+                                                                id={`new-task-desc-${col.id}`}
+                                                                name="description"
+                                                                rows={2}
+                                                                className={textareaClass}
+                                                                placeholder="Description (optional)"
+                                                            />
+                                                            <InputError
+                                                                message={te.description}
+                                                            />
+                                                        </div>
+                                                        <div className="grid gap-1">
+                                                            <Label
+                                                                className="text-xs text-muted-foreground"
+                                                                htmlFor={`new-task-assignee-${col.id}`}
+                                                            >
+                                                                Assignee
+                                                            </Label>
+                                                            <select
+                                                                id={`new-task-assignee-${col.id}`}
+                                                                name="assignee_id"
+                                                                defaultValue=""
+                                                                className="border-input bg-background h-9 w-full rounded-md border px-2 text-xs"
+                                                            >
+                                                                <option value="">
+                                                                    Unassigned
+                                                                </option>
+                                                                {assignableUsers.map(
+                                                                    (u) => (
+                                                                        <option
+                                                                            key={u.id}
+                                                                            value={u.id}
+                                                                        >
+                                                                            {u.name}
+                                                                        </option>
+                                                                    ),
+                                                                )}
+                                                            </select>
+                                                            <InputError
+                                                                message={te.assignee_id}
+                                                            />
+                                                        </div>
+                                                        <Button
+                                                            type="submit"
+                                                            size="sm"
+                                                            disabled={processing}
+                                                            className="w-full"
+                                                        >
+                                                            {processing && <Spinner />}
+                                                            Add task
+                                                        </Button>
+                                                    </>
+                                                )}
+                                            </Form>
+                                        </div>
+                                    )}
+
+                                    {can.manageColumns && (
                                         <div className="flex flex-col gap-4 p-4">
                                             <Form
                                                 {...ColumnController.update.form(
@@ -314,11 +759,6 @@ export default function ProjectBoard() {
                                                     )}
                                                 </Form>
                                             </div>
-                                        </div>
-                                    ) : (
-                                        <div className="p-4 text-xs text-muted-foreground">
-                                            Tasks will appear here in a later
-                                            phase.
                                         </div>
                                     )}
                                 </article>

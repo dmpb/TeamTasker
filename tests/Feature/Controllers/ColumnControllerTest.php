@@ -2,6 +2,7 @@
 
 use App\Models\Column;
 use App\Models\Project;
+use App\Models\Task;
 use App\Models\Team;
 use App\Models\TeamMember;
 use App\Models\User;
@@ -29,6 +30,18 @@ it('redirects guests from project column routes', function () {
     $this->post(route('teams.projects.columns.reorder', [$team, $project]), [
         'column_ids' => [$column->id],
     ])->assertRedirect(route('login'));
+
+    $task = Task::factory()->forColumn($column)->create();
+    $this->post(route('teams.projects.columns.tasks.store', [$team, $project, $column]), [
+        'title' => 'T',
+    ])->assertRedirect(route('login'));
+    $this->patch(route('teams.projects.tasks.update', [$team, $project, $task]), [
+        'title' => 'U',
+    ])->assertRedirect(route('login'));
+    $this->post(route('teams.projects.tasks.move', [$team, $project, $task]), [
+        'target_column_id' => $column->id,
+    ])->assertRedirect(route('login'));
+    $this->delete(route('teams.projects.tasks.destroy', [$team, $project, $task]))->assertRedirect(route('login'));
 });
 
 it('forbids the board for users outside the team', function () {
@@ -57,8 +70,11 @@ it('shows the board with columns for a team member', function () {
             ->component('teams/projects/board')
             ->where('project.name', 'Sprint')
             ->where('can.manageColumns', true)
+            ->where('can.manageTasks', true)
             ->has('columns', 1)
-            ->where('columns.0.name', 'Todo'));
+            ->where('columns.0.name', 'Todo')
+            ->has('columns.0.tasks', 0)
+            ->has('assignableUsers', 1));
 });
 
 it('allows plain members to view the board but not mutate columns', function () {
@@ -73,7 +89,10 @@ it('allows plain members to view the board but not mutate columns', function () 
     $this->actingAs($member)
         ->get(route('teams.projects.board', [$team, $project]))
         ->assertOk()
-        ->assertInertia(fn ($page) => $page->where('can.manageColumns', false));
+        ->assertInertia(fn ($page) => $page
+            ->where('can.manageColumns', false)
+            ->where('can.manageTasks', false)
+            ->where('assignableUsers', []));
 
     $this->actingAs($member)
         ->from(route('teams.projects.board', [$team, $project]))
@@ -94,6 +113,18 @@ it('allows plain members to view the board but not mutate columns', function () 
         ->post(route('teams.projects.columns.reorder', [$team, $project]), [
             'column_ids' => [$column->id],
         ])
+        ->assertForbidden();
+
+    $task = Task::factory()->forColumn($column)->create();
+
+    $this->actingAs($member)
+        ->post(route('teams.projects.columns.tasks.store', [$team, $project, $column]), [
+            'title' => 'N',
+        ])
+        ->assertForbidden();
+
+    $this->actingAs($member)
+        ->delete(route('teams.projects.tasks.destroy', [$team, $project, $task]))
         ->assertForbidden();
 });
 
