@@ -45,4 +45,9 @@ class Team extends Model
             ->where('user_id', $user->id)
             ->first();
     }
+
+    public function projects(): HasMany
+    {
+        return $this->hasMany(Project::class);
+    }
 }

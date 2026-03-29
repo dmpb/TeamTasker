@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import AppLayout from '@/layouts/app-layout';
 import { index as teamsIndex, show as teamsShow } from '@/routes/teams';
+import { index as teamProjectsIndex } from '@/routes/teams/projects';
 import type { BreadcrumbItem } from '@/types';
 
 type Team = {
@@ -91,12 +92,28 @@ export default function TeamsIndex() {
                         ) : (
                             (teams ?? []).map((team) => (
                                 <li key={team.id} className="px-3 py-2">
-                                    <Link
-                                        href={teamsShow(Number(team.id))}
-                                        className="text-sm font-medium hover:underline"
-                                    >
-                                        {team.name ?? team.id}
-                                    </Link>
+                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                        <Link
+                                            href={teamsShow(Number(team.id))}
+                                            className="text-sm font-medium hover:underline"
+                                        >
+                                            {team.name ?? team.id}
+                                        </Link>
+                                        <span
+                                            className="text-xs text-muted-foreground"
+                                            aria-hidden
+                                        >
+                                            ·
+                                        </span>
+                                        <Link
+                                            href={teamProjectsIndex(
+                                                Number(team.id),
+                                            )}
+                                            className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+                                        >
+                                            Projects
+                                        </Link>
+                                    </div>
                                 </li>
                             ))
                         )}

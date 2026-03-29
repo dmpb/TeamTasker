@@ -32,4 +32,13 @@ class TeamPolicy
 
         return $membership !== null && $membership->role === TeamMemberRole::Admin;
     }
+
+    /**
+     * Whether the user can create, update, archive, or delete projects for the team.
+     * Same privilege level as member management (owner or admin).
+     */
+    public function manageProjects(User $user, Team $team): bool
+    {
+        return $this->manageMembers($user, $team);
+    }
 }

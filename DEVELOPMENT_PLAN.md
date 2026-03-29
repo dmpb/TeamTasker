@@ -30,13 +30,18 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 - **Inertia compartido**  
   - `HandleInertiaRequests`: `auth.user`, nombre de app, estado del sidebar.
 
+- **Projects (Phase 2 — MVP por equipo)**  
+  - Persistencia: migración `projects`, modelo `Project`, `Team::projects()`, `ProjectRepository`, `ProjectFactory`, tests de repositorio y relaciones.  
+  - HTTP: `ProjectService`, `ProjectController`, rutas anidadas `teams/{team}/projects` con `scopeBindings`, form requests.  
+  - Autorización: `TeamPolicy::manageProjects`; `ProjectPolicy` (vista/creación/mutación en contexto de equipo).  
+  - Inertia `teams/projects/index` + navegación: enlace desde `teams/show`, enlace **Projects** por equipo en `teams/index`, atajos en sidebar (`teamsForNav` en `HandleInertiaRequests`).  
+  - Tests: `ProjectControllerTest`, `DashboardTest` (`teamsForNav`).
+
 ### Módulos incompletos / riesgos
 
-- Rutas reales `GET /teams` y `POST /teams` en `web.php` (y nombres de ruta); alineación `auth` vs `auth` + `verified` con el resto de la app.  
-- Policies y reglas multi-tenant para acciones más allá del listado por usuario.  
+- **Projects (Kanban tablero, columnas, tarjetas):** Phase 3+.  
 - `team_members.role`: enum en modelo + CHECK en PostgreSQL/MySQL; SQLite en tests sin CHECK (solo capa PHP).  
-- `getTeamsByUser`: posible refactor de precedencia (`where(function …)`) al añadir filtros.  
-- Solo `UserFactory`; conviene `TeamFactory` / `TeamMemberFactory` para tests.
+- `getTeamsByUser`: posible refactor de precedencia (`where(function …)`) al añadir filtros.
 
 ### Reglas de ejecución (chunks)
 
@@ -155,7 +160,7 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 
 ### Phase 2 — Projects (por equipo)
 
-#### Phase 2.A – Backend Foundation
+#### Phase 2.A – Backend Foundation ✅ *Completada*
 
 **Objetivo:** Persistencia y relaciones Project ↔ Team.
 
@@ -165,11 +170,13 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 - Modelo `Project`; relaciones en `Team` y `Project`.  
 - `ProjectRepository`: listar/crear/actualizar/archivar(o eliminar) filtrado por `team_id`.
 
+**Implementado:** Tabla `projects` con `archived_at` para archivar sin borrar; `cascadeOnDelete` al eliminar equipo; `ProjectRepository::listProjectsForTeam` (flag `includeArchived`), `createProject`, `updateProject`, `archiveProject`, `restoreProject`, `deleteProject`; factory y tests de repositorio, relaciones Eloquent y cascade.
+
 **Criterios de cierre:** Migración reversible; tests de repositorio o smoke de modelo.
 
 ---
 
-#### Phase 2.B – Application Layer
+#### Phase 2.B – Application Layer ✅ *Completada*
 
 **Objetivo:** Casos de uso y rutas con contexto de equipo.
 
@@ -180,11 +187,13 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 - Policies para proyecto en contexto de equipo.  
 - Pest: CRUD autorizado / no autorizado.
 
+**Implementado:** `ProjectService` delegando en `ProjectRepository`; rutas `teams.projects.*` con `Route::scopeBindings()`; autorización en Form Requests y controlador (`view` de equipo para índice; `manageProjects` para mutaciones); listado con `include_archived` solo si el usuario puede gestionar; Inertia `teams/projects/index` con formularios Wayfinder para store/update/archive/unarchive/destroy; enlace desde `teams/show`. Wayfinder: `php artisan wayfinder:generate --with-form` tras cambiar rutas.
+
 **Criterios de cierre:** Flujo principal sin JSON; Inertia + redirects; tests verdes.
 
 ---
 
-#### Phase 2.C – Frontend Integration
+#### Phase 2.C – Frontend Integration ✅ *Completada*
 
 **Objetivo:** Listar y crear proyectos dentro de un equipo.
 
@@ -193,6 +202,8 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 - Página listado proyectos (props desde `index`).  
 - Formulario crear/editar proyecto con Inertia.  
 - Navegación desde vista de equipo hacia proyectos.
+
+**Implementado:** Enlace explícito **Projects** en cada fila de `teams/index`; grupo **Team projects** en sidebar (`teamsForNav` compartido vía `HandleInertiaRequests`, hasta 8 equipos del usuario, enlaces a `teams/{id}/projects` con icono y estado activo); empty state en `teams/projects/index` (icono, copy según `can.manageProjects`). Tests Inertia en `DashboardTest` para `teamsForNav`.
 
 **Criterios de cierre:** Usuario con permiso gestiona proyectos solo de su equipo.
 

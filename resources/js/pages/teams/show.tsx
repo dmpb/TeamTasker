@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import AppLayout from '@/layouts/app-layout';
 import { index as teamsIndex, show as teamsShow } from '@/routes/teams';
+import { index as teamProjectsIndex } from '@/routes/teams/projects';
 import type { BreadcrumbItem } from '@/types';
 
 type MemberRow = {
@@ -67,12 +68,20 @@ export default function TeamShow() {
                         title={team.name}
                         description="Members, roles, and access for this team."
                     />
-                    <Link
-                        href={teamsIndex()}
-                        className="text-sm text-muted-foreground underline-offset-4 hover:underline"
-                    >
-                        Back to teams
-                    </Link>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                        <Link
+                            href={teamProjectsIndex(team.id)}
+                            className="text-sm font-medium text-muted-foreground underline-offset-4 hover:underline"
+                        >
+                            Projects
+                        </Link>
+                        <Link
+                            href={teamsIndex()}
+                            className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+                        >
+                            Back to teams
+                        </Link>
+                    </div>
                 </div>
 
                 {can.manageMembers && (
