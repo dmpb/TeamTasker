@@ -10,7 +10,10 @@ use Illuminate\Database\Eloquent\Collection;
 
 class CommentService
 {
-    public function __construct(public CommentRepository $commentRepository) {}
+    public function __construct(
+        public CommentRepository $commentRepository,
+        public ActivityLogService $activityLogService,
+    ) {}
 
     /**
      * @return Collection<int, Comment>
@@ -20,18 +23,25 @@ class CommentService
         return $this->commentRepository->listCommentsForTask($task);
     }
 
-    public function createComment(Task $task, User $user, string $body): Comment
+    public function createComment(Task $task, User $user, string $body, ?User $actor = null): Comment
     {
-        return $this->commentRepository->createComment($task, $user, $body);
+        $comment = $this->commentRepository->createComment($task, $user, $body);
+        $this->activityLogService->recordCommentCreated($comment, $actor ?? $user);
+
+        return $comment;
     }
 
-    public function updateComment(Comment $comment, string $body): Comment
+    public function updateComment(Comment $comment, string $body, ?User $actor = null): Comment
     {
-        return $this->commentRepository->updateComment($comment, $body);
+        $updatedComment = $this->commentRepository->updateComment($comment, $body);
+        $this->activityLogService->recordCommentUpdated($updatedComment, $actor);
+
+        return $updatedComment;
     }
 
-    public function deleteComment(Comment $comment): void
+    public function deleteComment(Comment $comment, ?User $actor = null): void
     {
+        $this->activityLogService->recordCommentDeleted($comment, $actor);
         $this->commentRepository->deleteComment($comment);
     }
 }

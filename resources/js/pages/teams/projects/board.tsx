@@ -17,6 +17,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import AppLayout from '@/layouts/app-layout';
 import { index as teamsIndex, show as teamsShow } from '@/routes/teams';
+import { index as projectActivityIndex } from '@/routes/teams/projects/activity/index';
 import { board as projectBoard, index as teamProjectsIndex } from '@/routes/teams/projects';
 import { index as taskCommentsIndex } from '@/routes/teams/projects/tasks/comments/index';
 import type { BreadcrumbItem } from '@/types';
@@ -130,6 +131,12 @@ export default function ProjectBoard() {
                         className="text-sm text-muted-foreground underline-offset-4 hover:underline"
                     >
                         Back to projects
+                    </Link>
+                    <Link
+                        href={projectActivityIndex.url({ team: team.id, project: project.id })}
+                        className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+                    >
+                        View activity
                     </Link>
                 </div>
 

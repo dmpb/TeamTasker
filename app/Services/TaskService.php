@@ -11,7 +11,10 @@ use Illuminate\Database\Eloquent\Collection;
 
 class TaskService
 {
-    public function __construct(public TaskRepository $taskRepository) {}
+    public function __construct(
+        public TaskRepository $taskRepository,
+        public ActivityLogService $activityLogService,
+    ) {}
 
     /**
      * Columns with `tasks` eager-loaded and ordered (avoids N+1 on the board).
@@ -37,9 +40,13 @@ class TaskService
         string $title,
         ?string $description = null,
         ?User $assignee = null,
+        ?User $actor = null,
         ?int $position = null,
     ): Task {
-        return $this->taskRepository->createTask($project, $column, $title, $description, $assignee, $position);
+        $task = $this->taskRepository->createTask($project, $column, $title, $description, $assignee, $position);
+        $this->activityLogService->recordTaskCreated($task, $actor);
+
+        return $task;
     }
 
     public function updateTask(
@@ -47,17 +54,29 @@ class TaskService
         string $title,
         ?string $description = null,
         ?User $assignee = null,
+        ?User $actor = null,
     ): Task {
-        return $this->taskRepository->updateTask($task, $title, $description, $assignee);
+        $updatedTask = $this->taskRepository->updateTask($task, $title, $description, $assignee);
+        $this->activityLogService->recordTaskUpdated($updatedTask, $actor);
+
+        return $updatedTask;
     }
 
-    public function moveTaskToColumn(Task $task, Column $targetColumn): Task
+    public function moveTaskToColumn(Task $task, Column $targetColumn, ?User $actor = null): Task
     {
-        return $this->taskRepository->moveTaskToColumn($task, $targetColumn);
+        $fromColumnId = $task->column_id;
+        $movedTask = $this->taskRepository->moveTaskToColumn($task, $targetColumn);
+
+        if ($fromColumnId !== $movedTask->column_id) {
+            $this->activityLogService->recordTaskMoved($movedTask, $fromColumnId, $movedTask->column_id, $actor);
+        }
+
+        return $movedTask;
     }
 
-    public function deleteTask(Task $task): void
+    public function deleteTask(Task $task, ?User $actor = null): void
     {
+        $this->activityLogService->recordTaskDeleted($task, $actor);
         $this->taskRepository->deleteTask($task);
     }
 }

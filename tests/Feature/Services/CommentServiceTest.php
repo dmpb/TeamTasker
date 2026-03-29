@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\ActivityLog;
 use App\Models\Column;
 use App\Models\Project;
 use App\Models\Task;
@@ -31,5 +32,18 @@ it('manages comments for a task in a known team project', function () {
     expect($updated->body)->toBe('Looks really good');
 
     $service->deleteComment($updated);
-    expect($service->listTaskComments($task))->toHaveCount(1);
+    expect($service->listTaskComments($task))->toHaveCount(1)
+        ->and(ActivityLog::query()
+            ->where('project_id', $project->id)
+            ->where('event', 'comment.created')
+            ->where('actor_id', $member->id)
+            ->exists())->toBeTrue()
+        ->and(ActivityLog::query()
+            ->where('project_id', $project->id)
+            ->where('event', 'comment.updated')
+            ->exists())->toBeTrue()
+        ->and(ActivityLog::query()
+            ->where('project_id', $project->id)
+            ->where('event', 'comment.deleted')
+            ->exists())->toBeTrue();
 });

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\ColumnController;
 use App\Http\Controllers\CommentController;
 use App\Http\Controllers\ProjectController;
@@ -31,6 +32,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('teams/{team}/projects/{project}', [ProjectController::class, 'destroy'])->name('teams.projects.destroy');
 
         Route::get('teams/{team}/projects/{project}/board', [ColumnController::class, 'board'])->name('teams.projects.board');
+        Route::get('teams/{team}/projects/{project}/activity', [ActivityLogController::class, 'index'])->name('teams.projects.activity.index');
         Route::post('teams/{team}/projects/{project}/columns/reorder', [ColumnController::class, 'reorder'])->name('teams.projects.columns.reorder');
         Route::post('teams/{team}/projects/{project}/columns/{column}/tasks', [TaskController::class, 'store'])->name('teams.projects.columns.tasks.store');
         Route::post('teams/{team}/projects/{project}/columns', [ColumnController::class, 'store'])->name('teams.projects.columns.store');

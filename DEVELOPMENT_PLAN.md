@@ -358,7 +358,7 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 
 ### Phase 6 — Activity Log
 
-#### Phase 6.A – Backend Foundation
+#### Phase 6.A – Backend Foundation ✅ *Completada*
 
 **Objetivo:** Registro auditable de eventos clave.
 
@@ -368,11 +368,13 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 - Modelo + `ActivityLogRepository`.  
 - `ActivityLogService` + llamadas desde **servicios** existentes (crear tarea, mover, comentar, etc.) sin lógica pesada en modelos.
 
+**Implementado:** migración `activity_logs` con `project_id`, `actor_id`, `event`, `subject` polimórfico y `metadata` JSON; modelo `ActivityLog` con casts/relaciones (`project`, `actor`, `subject`) y relaciones inversas en `Project`/`User`; `ActivityLogRepository` (crear y listar por proyecto) y `ActivityLogService` (eventos `task.*` y `comment.*`); integración en `TaskService` y `CommentService` para registrar crear/editar/mover/borrar tarea y crear/editar/borrar comentario; controladores de tareas/comentarios actualizados para pasar actor autenticado; tests en `ActivityLogServiceTest` y ampliación de `TaskServiceTest`/`CommentServiceTest` para verificar persistencia de eventos.
+
 **Criterios de cierre:** Tests de que eventos esperados se persisten en acciones clave.
 
 ---
 
-#### Phase 6.B – Application Layer
+#### Phase 6.B – Application Layer ✅ *Completada*
 
 **Objetivo:** Exponer lectura del log vía Inertia (sin API).
 
@@ -382,11 +384,13 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 - Controlador mínimo + policy de lectura acorde al contexto.  
 - Pest: solo usuarios autorizados ven entradas del log relevantes.
 
+**Implementado:** ruta dedicada `GET teams/{team}/projects/{project}/activity` (`teams.projects.activity.index`) con `scopeBindings`; `ActivityLogController@index` vía `Inertia::render('teams/projects/activity/index')` y props acotados (`team`, `project`, `activityLogs`); `ActivityLogPolicy` (`viewAny` por proyecto y `view` por registro, delegando en acceso a proyecto/equipo); repositorio de logs con eager-load de `actor`; página Inertia base para consumo del backend; Pest `ActivityLogControllerTest` cubriendo invitado, usuario de otro equipo, miembro autorizado y 404 por mezcla team/proyecto.
+
 **Criterios de cierre:** Datos del log disponibles como props Inertia donde se definió.
 
 ---
 
-#### Phase 6.C – Frontend Integration
+#### Phase 6.C – Frontend Integration ✅ *Completada*
 
 **Objetivo:** Timeline legible.
 
@@ -394,6 +398,8 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 
 - Componente de lista/timeline consumiendo props.  
 - Integrar en vista de tarea o proyecto según Phase 6.B.
+
+**Implementado:** `teams/projects/activity/index.tsx` ahora renderiza timeline legible de eventos (tipo de evento con icono, actor, fecha formateada, descripción derivada de `metadata`/`subject`, y estado vacío); sin fetch extra, todo consumido desde props Inertia de Phase 6.B; navegación integrada desde `teams/projects/board.tsx` con enlace **View activity** a la ruta del log del proyecto.
 
 **Criterios de cierre:** Usuario ve historial acotado a lo que el backend envía (sin fetch ad hoc).
 

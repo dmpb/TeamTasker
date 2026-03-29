@@ -12,6 +12,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Services\TaskService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 
 class TaskController extends Controller
 {
@@ -34,6 +35,7 @@ class TaskController extends Controller
             $validated['title'],
             $validated['description'] ?? null,
             $assignee,
+            $request->user(),
         );
 
         return redirect()->route('teams.projects.board', [$team, $project]);
@@ -55,6 +57,7 @@ class TaskController extends Controller
             $validated['title'],
             $validated['description'] ?? null,
             $assignee,
+            $request->user(),
         );
 
         return redirect()->route('teams.projects.board', [$team, $project]);
@@ -69,18 +72,18 @@ class TaskController extends Controller
 
         $targetColumn = Column::query()->findOrFail($validated['target_column_id']);
 
-        $this->taskService->moveTaskToColumn($task, $targetColumn);
+        $this->taskService->moveTaskToColumn($task, $targetColumn, $request->user());
 
         return redirect()->route('teams.projects.board', [$team, $project]);
     }
 
-    public function destroy(Team $team, Project $project, Task $task): RedirectResponse
+    public function destroy(Request $request, Team $team, Project $project, Task $task): RedirectResponse
     {
         abort_unless($project->team_id === $team->id, 404);
 
         $this->authorize('delete', $task);
 
-        $this->taskService->deleteTask($task);
+        $this->taskService->deleteTask($task, $request->user());
 
         return redirect()->route('teams.projects.board', [$team, $project]);
     }

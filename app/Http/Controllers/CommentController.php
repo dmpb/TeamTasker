@@ -11,6 +11,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Services\CommentService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -67,7 +68,7 @@ class CommentController extends Controller
         /** @var array{ body: string } $validated */
         $validated = $request->validated();
 
-        $this->commentService->createComment($task, $request->user(), $validated['body']);
+        $this->commentService->createComment($task, $request->user(), $validated['body'], $request->user());
 
         return redirect()->route('teams.projects.tasks.comments.index', [$team, $project, $task]);
     }
@@ -79,12 +80,12 @@ class CommentController extends Controller
         /** @var array{ body: string } $validated */
         $validated = $request->validated();
 
-        $this->commentService->updateComment($comment, $validated['body']);
+        $this->commentService->updateComment($comment, $validated['body'], $request->user());
 
         return redirect()->route('teams.projects.tasks.comments.index', [$team, $project, $task]);
     }
 
-    public function destroy(Team $team, Project $project, Task $task, Comment $comment): RedirectResponse
+    public function destroy(Request $request, Team $team, Project $project, Task $task, Comment $comment): RedirectResponse
     {
         $this->abortUnlessTaskInProject($team, $project, $task);
 
@@ -92,7 +93,7 @@ class CommentController extends Controller
 
         $this->authorize('delete', $comment);
 
-        $this->commentService->deleteComment($comment);
+        $this->commentService->deleteComment($comment, $request->user());
 
         return redirect()->route('teams.projects.tasks.comments.index', [$team, $project, $task]);
     }
