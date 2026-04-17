@@ -21,12 +21,14 @@ class TaskPolicy
      */
     public function create(User $user, Column $column): bool
     {
-        return $user->can('update', $column->project);
+        return $column->project->archived_at === null
+            && $user->can('update', $column->project);
     }
 
     public function update(User $user, Task $task): bool
     {
-        return $user->can('update', $task->project);
+        return $task->project->archived_at === null
+            && $user->can('update', $task->project);
     }
 
     public function delete(User $user, Task $task): bool

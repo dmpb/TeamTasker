@@ -2,6 +2,7 @@ import { Head, Link, usePage } from '@inertiajs/react';
 import { CircleCheck, CircleDashed, MessageSquare, MoveRight, Pencil, Trash2 } from 'lucide-react';
 import AppLayout from '@/layouts/app-layout';
 import { index as teamsIndex, show as teamsShow } from '@/routes/teams';
+import { index as projectActivityIndex } from '@/routes/teams/projects/activity';
 import { board as projectBoard, index as teamProjectsIndex } from '@/routes/teams/projects';
 import type { BreadcrumbItem } from '@/types';
 
@@ -102,7 +103,7 @@ export default function ProjectActivityIndex() {
         { title: team.name, href: teamsShow(team.id) },
         { title: 'Projects', href: teamProjectsIndex.url({ team: team.id }) },
         { title: project.name, href: projectBoard.url({ team: team.id, project: project.id }) },
-        { title: 'Activity' },
+        { title: 'Activity', href: projectActivityIndex.url({ team: team.id, project: project.id }) },
     ];
 
     return (

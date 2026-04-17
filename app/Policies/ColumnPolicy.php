@@ -13,16 +13,19 @@ class ColumnPolicy
      */
     public function create(User $user, Project $project): bool
     {
-        return $user->can('update', $project);
+        return $project->archived_at === null
+            && $user->can('update', $project);
     }
 
     public function update(User $user, Column $column): bool
     {
-        return $user->can('update', $column->project);
+        return $column->project->archived_at === null
+            && $user->can('update', $column->project);
     }
 
     public function delete(User $user, Column $column): bool
     {
-        return $user->can('update', $column->project);
+        return $column->project->archived_at === null
+            && $user->can('update', $column->project);
     }
 }

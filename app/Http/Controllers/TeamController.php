@@ -6,6 +6,7 @@ use App\Http\Requests\StoreTeamMemberRequest;
 use App\Http\Requests\StoreTeamRequest;
 use App\Http\Requests\UpdateTeamMemberRequest;
 use App\Models\Team;
+use App\Models\TeamMember;
 use App\Models\User;
 use App\Services\TeamService;
 use Illuminate\Http\RedirectResponse;
@@ -38,10 +39,11 @@ class TeamController extends Controller
 
         /** @var User $user */
         $user = $request->user();
+        $canManageMembers = $user->can('manageMembers', $team);
 
         return Inertia::render('teams/show', [
             'team' => $team->only(['id', 'name', 'owner_id']),
-            'members' => $team->members->map(function ($member) use ($user, $team): array {
+            'members' => $team->members->map(function ($member) use ($canManageMembers, $team): array {
                 $memberUserId = $member->user->id;
 
                 return [
@@ -52,12 +54,12 @@ class TeamController extends Controller
                         'name' => $member->user->name,
                         'email' => $member->user->email,
                     ],
-                    'can_update_role' => $user->can('manageMembers', $team) && $memberUserId !== $team->owner_id,
-                    'can_remove' => $user->can('manageMembers', $team) && $memberUserId !== $team->owner_id,
+                    'can_update_role' => $canManageMembers && $memberUserId !== $team->owner_id,
+                    'can_remove' => $canManageMembers && $memberUserId !== $team->owner_id,
                 ];
             })->values()->all(),
             'can' => [
-                'manageMembers' => $user->can('manageMembers', $team),
+                'manageMembers' => $canManageMembers,
             ],
         ]);
     }
@@ -90,13 +92,13 @@ class TeamController extends Controller
         return back();
     }
 
-    public function updateMember(UpdateTeamMemberRequest $request, Team $team, User $user): RedirectResponse
+    public function updateMember(UpdateTeamMemberRequest $request, Team $team, TeamMember $member): RedirectResponse
     {
         /** @var array{ role: string } $validated */
         $validated = $request->validated();
 
         try {
-            $this->teamService->updateMemberRoleInTeam($team, $user, $validated['role']);
+            $this->teamService->updateMemberRoleInTeam($team, $member->user, $validated['role']);
         } catch (InvalidArgumentException $e) {
             return back()->withErrors(['role' => $e->getMessage()]);
         }
@@ -104,12 +106,12 @@ class TeamController extends Controller
         return back();
     }
 
-    public function destroyMember(Request $request, Team $team, User $user): RedirectResponse
+    public function destroyMember(Request $request, Team $team, TeamMember $member): RedirectResponse
     {
         $this->authorize('manageMembers', $team);
 
         try {
-            $this->teamService->removeMemberFromTeam($team, $user);
+            $this->teamService->removeMemberFromTeam($team, $member->user);
         } catch (InvalidArgumentException $e) {
             return back()->withErrors(['user' => $e->getMessage()]);
         }

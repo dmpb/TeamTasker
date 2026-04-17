@@ -15,7 +15,6 @@ class ActivityLogController extends Controller
 
     public function index(Team $team, Project $project): Response
     {
-        abort_unless($project->team_id === $team->id, 404);
         $this->authorize('viewAny', [ActivityLog::class, $project]);
 
         $logs = $this->activityLogService->listProjectLogs($project, 100);

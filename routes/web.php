@@ -6,6 +6,8 @@ use App\Http\Controllers\CommentController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TeamController;
+use App\Models\TeamMember;
+use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
 
@@ -20,10 +22,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('teams', [TeamController::class, 'store'])->name('teams.store');
     Route::get('teams/{team}', [TeamController::class, 'show'])->name('teams.show');
     Route::post('teams/{team}/members', [TeamController::class, 'storeMember'])->name('teams.members.store');
-    Route::patch('teams/{team}/members/{user}', [TeamController::class, 'updateMember'])->name('teams.members.update');
-    Route::delete('teams/{team}/members/{user}', [TeamController::class, 'destroyMember'])->name('teams.members.destroy');
 
     Route::scopeBindings()->group(function () {
+        Route::bind('member', static function (string $value, RoutingRoute $route): TeamMember {
+            $teamId = (int) $route->parameter('team');
+
+            /** @var TeamMember $member */
+            $member = TeamMember::query()
+                ->whereKey((int) $value)
+                ->where('team_id', $teamId)
+                ->firstOrFail();
+
+            return $member;
+        });
+
+        Route::patch('teams/{team}/members/{member}', [TeamController::class, 'updateMember'])->name('teams.members.update');
+        Route::delete('teams/{team}/members/{member}', [TeamController::class, 'destroyMember'])->name('teams.members.destroy');
+
         Route::get('teams/{team}/projects', [ProjectController::class, 'index'])->name('teams.projects.index');
         Route::post('teams/{team}/projects', [ProjectController::class, 'store'])->name('teams.projects.store');
         Route::patch('teams/{team}/projects/{project}', [ProjectController::class, 'update'])->name('teams.projects.update');

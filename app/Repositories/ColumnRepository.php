@@ -5,6 +5,7 @@ namespace App\Repositories;
 use App\Models\Column;
 use App\Models\Project;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -31,15 +32,35 @@ class ColumnRepository
 
     public function createColumn(Project $project, string $name, ?int $position = null): Column
     {
-        if ($position === null) {
-            $position = $this->nextPositionForProject($project);
-        }
+        $attempts = 0;
 
-        return Column::query()->create([
-            'project_id' => $project->id,
-            'name' => $name,
-            'position' => $position,
-        ]);
+        while (true) {
+            try {
+                return DB::transaction(function () use ($project, $name, $position): Column {
+                    $resolvedPosition = $position;
+
+                    if ($resolvedPosition === null) {
+                        // Lock existing rows to prevent duplicate "max + 1" assignments.
+                        Column::query()
+                            ->where('project_id', $project->id)
+                            ->lockForUpdate()
+                            ->get();
+
+                        $resolvedPosition = $this->nextPositionForProject($project);
+                    }
+
+                    return Column::query()->create([
+                        'project_id' => $project->id,
+                        'name' => $name,
+                        'position' => $resolvedPosition,
+                    ]);
+                });
+            } catch (QueryException $e) {
+                if (! $this->isUniqueViolation($e) || ++$attempts >= 3 || $position !== null) {
+                    throw $e;
+                }
+            }
+        }
     }
 
     public function updateColumn(Column $column, string $name): Column
@@ -97,5 +118,10 @@ class ColumnRepository
                 Column::query()->whereKey($id)->update(['position' => $i]);
             }
         });
+    }
+
+    private function isUniqueViolation(QueryException $e): bool
+    {
+        return ($e->errorInfo[0] ?? null) === '23505';
     }
 }

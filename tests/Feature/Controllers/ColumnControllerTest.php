@@ -173,6 +173,28 @@ it('lets owners create update delete and reorder columns', function () {
     expect(Column::query()->whereKey($colB->id)->exists())->toBeFalse();
 });
 
+it('blocks column mutations when the project is archived', function () {
+    $owner = User::factory()->create();
+    $team = Team::factory()->forOwner($owner)->create();
+    $project = Project::factory()->forTeam($team)->archived()->create();
+    $column = Column::factory()->forProject($project)->create(['name' => 'A']);
+
+    /** @var TestCase $this */
+    $this->actingAs($owner)
+        ->post(route('teams.projects.columns.store', [$team, $project]), ['name' => 'B'])
+        ->assertForbidden();
+
+    $this->actingAs($owner)
+        ->patch(route('teams.projects.columns.update', [$team, $project, $column]), [
+            'name' => 'Renamed',
+        ])
+        ->assertForbidden();
+
+    $this->actingAs($owner)
+        ->delete(route('teams.projects.columns.destroy', [$team, $project, $column]))
+        ->assertForbidden();
+});
+
 it('returns 404 when the project belongs to another team', function () {
     $owner = User::factory()->create();
     $teamA = Team::factory()->forOwner($owner)->create();

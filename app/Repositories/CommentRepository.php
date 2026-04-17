@@ -16,7 +16,7 @@ class CommentRepository
     {
         return Comment::query()
             ->where('task_id', $task->id)
-            ->with('user')
+            ->with(['user', 'task.project'])
             ->orderBy('id')
             ->get();
     }

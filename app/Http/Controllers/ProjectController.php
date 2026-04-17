@@ -69,8 +69,6 @@ class ProjectController extends Controller
     {
         $this->authorize('archive', $project);
 
-        abort_unless($project->team_id === $team->id, 404);
-
         $this->projectService->archiveProject($project);
 
         return redirect()->route('teams.projects.index', $team);
@@ -80,8 +78,6 @@ class ProjectController extends Controller
     {
         $this->authorize('unarchive', $project);
 
-        abort_unless($project->team_id === $team->id, 404);
-
         $this->projectService->unarchiveProject($project);
 
         return redirect()->route('teams.projects.index', $team);
@@ -90,8 +86,6 @@ class ProjectController extends Controller
     public function destroy(Team $team, Project $project): RedirectResponse
     {
         $this->authorize('delete', $project);
-
-        abort_unless($project->team_id === $team->id, 404);
 
         $this->projectService->deleteProject($project);
 

@@ -20,8 +20,6 @@ class TaskController extends Controller
 
     public function store(StoreTaskRequest $request, Team $team, Project $project, Column $column): RedirectResponse
     {
-        abort_unless($project->team_id === $team->id, 404);
-
         /** @var array{ title: string, description?: string|null, assignee_id?: int|null } $validated */
         $validated = $request->validated();
 
@@ -43,8 +41,6 @@ class TaskController extends Controller
 
     public function update(UpdateTaskRequest $request, Team $team, Project $project, Task $task): RedirectResponse
     {
-        abort_unless($project->team_id === $team->id, 404);
-
         /** @var array{ title: string, description?: string|null, assignee_id?: int|null } $validated */
         $validated = $request->validated();
 
@@ -53,6 +49,7 @@ class TaskController extends Controller
             : null;
 
         $this->taskService->updateTask(
+            $project,
             $task,
             $validated['title'],
             $validated['description'] ?? null,
@@ -65,25 +62,21 @@ class TaskController extends Controller
 
     public function move(MoveTaskRequest $request, Team $team, Project $project, Task $task): RedirectResponse
     {
-        abort_unless($project->team_id === $team->id, 404);
-
         /** @var array{ target_column_id: int } $validated */
         $validated = $request->validated();
 
         $targetColumn = Column::query()->findOrFail($validated['target_column_id']);
 
-        $this->taskService->moveTaskToColumn($task, $targetColumn, $request->user());
+        $this->taskService->moveTaskToColumn($project, $task, $targetColumn, $request->user());
 
         return redirect()->route('teams.projects.board', [$team, $project]);
     }
 
     public function destroy(Request $request, Team $team, Project $project, Task $task): RedirectResponse
     {
-        abort_unless($project->team_id === $team->id, 404);
-
         $this->authorize('delete', $task);
 
-        $this->taskService->deleteTask($task, $request->user());
+        $this->taskService->deleteTask($project, $task, $request->user());
 
         return redirect()->route('teams.projects.board', [$team, $project]);
     }

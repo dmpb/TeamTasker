@@ -90,6 +90,7 @@ it('redirects guests from teams routes to login', function () {
     /** @var TestCase $this */
     $team = Team::factory()->create();
     $user = User::factory()->create();
+    $member = TeamMember::factory()->forTeam($team)->forUser($user)->create();
 
     $this->get(route('teams.index'))->assertRedirect(route('login'));
     $this->post(route('teams.store'), ['name' => 'X'])->assertRedirect(route('login'));
@@ -98,10 +99,10 @@ it('redirects guests from teams routes to login', function () {
         'user_id' => $user->id,
         'role' => 'member',
     ])->assertRedirect(route('login'));
-    $this->patch(route('teams.members.update', [$team, $user]), [
+    $this->patch(route('teams.members.update', [$team, $member]), [
         'role' => 'admin',
     ])->assertRedirect(route('login'));
-    $this->delete(route('teams.members.destroy', [$team, $user]))->assertRedirect(route('login'));
+    $this->delete(route('teams.members.destroy', [$team, $member]))->assertRedirect(route('login'));
 });
 
 it('forbids viewing a team the user does not belong to', function () {
@@ -158,14 +159,14 @@ it('forbids plain members from managing team membership via http', function () {
 
     $this->actingAs($plainMember)
         ->from(route('teams.show', $team))
-        ->patch(route('teams.members.update', [$team, $plainMember]), [
+        ->patch(route('teams.members.update', [$team, $team->membershipFor($plainMember)]), [
             'role' => 'admin',
         ])
         ->assertForbidden();
 
     $this->actingAs($plainMember)
         ->from(route('teams.show', $team))
-        ->delete(route('teams.members.destroy', [$team, $candidate]))
+        ->delete(route('teams.members.destroy', [$team, $team->membershipFor($plainMember)]))
         ->assertForbidden();
 });
 
@@ -193,7 +194,7 @@ it('allows admins to add members and remove non-owners', function () {
 
     $this->actingAs($admin)
         ->from(route('teams.show', $team))
-        ->delete(route('teams.members.destroy', [$team, $joining]))
+        ->delete(route('teams.members.destroy', [$team, $team->membershipFor($joining)]))
         ->assertRedirect(route('teams.show', $team));
 
     expect(TeamMember::query()
@@ -213,7 +214,7 @@ it('allows admins to update another member role', function () {
     /** @var TestCase $this */
     $this->actingAs($admin)
         ->from(route('teams.show', $team))
-        ->patch(route('teams.members.update', [$team, $target]), [
+        ->patch(route('teams.members.update', [$team, $team->membershipFor($target)]), [
             'role' => 'admin',
         ])
         ->assertRedirect(route('teams.show', $team));
@@ -235,7 +236,7 @@ it('rejects removing the team owner via member management', function () {
     /** @var TestCase $this */
     $this->actingAs($admin)
         ->from(route('teams.show', $team))
-        ->delete(route('teams.members.destroy', [$team, $owner]))
+        ->delete(route('teams.members.destroy', [$team, $team->membershipFor($owner)]))
         ->assertRedirect(route('teams.show', $team))
         ->assertSessionHasErrors('user');
 });
@@ -250,7 +251,7 @@ it('rejects changing the team owner role via member management', function () {
     /** @var TestCase $this */
     $this->actingAs($admin)
         ->from(route('teams.show', $team))
-        ->patch(route('teams.members.update', [$team, $owner]), [
+        ->patch(route('teams.members.update', [$team, $team->membershipFor($owner)]), [
             'role' => 'member',
         ])
         ->assertRedirect(route('teams.show', $team))
@@ -293,4 +294,24 @@ it('exposes owner row without remove or role change on team show', function () {
             ->has('members', 1)
             ->where('members.0.can_remove', false)
             ->where('members.0.can_update_role', false));
+});
+
+it('returns 404 when trying to manage a member from another team', function () {
+    $owner = User::factory()->create();
+    $admin = User::factory()->create();
+    $otherOwner = User::factory()->create();
+    $otherUser = User::factory()->create();
+
+    $team = Team::factory()->forOwner($owner)->create();
+    TeamMember::factory()->forTeam($team)->forUser($admin)->admin()->create();
+
+    $otherTeam = Team::factory()->forOwner($otherOwner)->create();
+    $otherMembership = TeamMember::factory()->forTeam($otherTeam)->forUser($otherUser)->create();
+
+    /** @var TestCase $this */
+    $this->actingAs($admin)
+        ->patch(route('teams.members.update', [$team, $otherMembership]), [
+            'role' => 'member',
+        ])
+        ->assertNotFound();
 });

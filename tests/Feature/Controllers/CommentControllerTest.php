@@ -96,6 +96,32 @@ it('lets team members list and create comments', function () {
             ->where('comments.0.can.delete', true));
 });
 
+it('blocks comment mutations when the project is archived', function () {
+    $owner = User::factory()->create();
+    $team = Team::factory()->forOwner($owner)->create();
+    $project = Project::factory()->forTeam($team)->archived()->create();
+    $column = Column::factory()->forProject($project)->create();
+    $task = Task::factory()->forColumn($column)->create();
+    $comment = Comment::factory()->forTask($task)->byUser($owner)->create();
+
+    /** @var TestCase $this */
+    $this->actingAs($owner)
+        ->post(route('teams.projects.tasks.comments.store', [$team, $project, $task]), [
+            'body' => 'Blocked',
+        ])
+        ->assertForbidden();
+
+    $this->actingAs($owner)
+        ->patch(route('teams.projects.tasks.comments.update', [$team, $project, $task, $comment]), [
+            'body' => 'Blocked update',
+        ])
+        ->assertForbidden();
+
+    $this->actingAs($owner)
+        ->delete(route('teams.projects.tasks.comments.destroy', [$team, $project, $task, $comment]))
+        ->assertForbidden();
+});
+
 it('returns 404 when the task belongs to another project in the url', function () {
     $owner = User::factory()->create();
     $team = Team::factory()->forOwner($owner)->create();

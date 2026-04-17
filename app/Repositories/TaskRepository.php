@@ -7,6 +7,7 @@ use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -62,18 +63,38 @@ class TaskRepository
             throw new InvalidArgumentException('Column does not belong to the given project.');
         }
 
-        if ($position === null) {
-            $position = $this->nextPositionForColumn($column);
-        }
+        $attempts = 0;
 
-        return Task::query()->create([
-            'project_id' => $project->id,
-            'column_id' => $column->id,
-            'title' => $title,
-            'description' => $description,
-            'assignee_id' => $assignee?->id,
-            'position' => $position,
-        ]);
+        while (true) {
+            try {
+                return DB::transaction(function () use ($project, $column, $title, $description, $assignee, $position): Task {
+                    $resolvedPosition = $position;
+
+                    if ($resolvedPosition === null) {
+                        // Lock tasks in the target column to serialize position assignment.
+                        Task::query()
+                            ->where('column_id', $column->id)
+                            ->lockForUpdate()
+                            ->get();
+
+                        $resolvedPosition = $this->nextPositionForColumn($column);
+                    }
+
+                    return Task::query()->create([
+                        'project_id' => $project->id,
+                        'column_id' => $column->id,
+                        'title' => $title,
+                        'description' => $description,
+                        'assignee_id' => $assignee?->id,
+                        'position' => $resolvedPosition,
+                    ]);
+                });
+            } catch (QueryException $e) {
+                if (! $this->isUniqueViolation($e) || ++$attempts >= 3 || $position !== null) {
+                    throw $e;
+                }
+            }
+        }
     }
 
     public function updateTask(
@@ -105,19 +126,39 @@ class TaskRepository
                 return $task;
             }
 
-            $nextPosition = $this->nextPositionForColumn($targetColumn);
+            $attempts = 0;
 
-            $task->update([
-                'column_id' => $targetColumn->id,
-                'position' => $nextPosition,
-            ]);
+            while (true) {
+                try {
+                    Task::query()
+                        ->where('column_id', $targetColumn->id)
+                        ->lockForUpdate()
+                        ->get();
 
-            return $task->refresh();
+                    $nextPosition = $this->nextPositionForColumn($targetColumn);
+
+                    $task->update([
+                        'column_id' => $targetColumn->id,
+                        'position' => $nextPosition,
+                    ]);
+
+                    return $task->refresh();
+                } catch (QueryException $e) {
+                    if (! $this->isUniqueViolation($e) || ++$attempts >= 3) {
+                        throw $e;
+                    }
+                }
+            }
         });
     }
 
     public function deleteTask(Task $task): void
     {
         $task->delete();
+    }
+
+    private function isUniqueViolation(QueryException $e): bool
+    {
+        return ($e->errorInfo[0] ?? null) === '23505';
     }
 }

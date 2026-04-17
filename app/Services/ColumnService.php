@@ -6,6 +6,7 @@ use App\Models\Column;
 use App\Models\Project;
 use App\Repositories\ColumnRepository;
 use Illuminate\Database\Eloquent\Collection;
+use InvalidArgumentException;
 
 class ColumnService
 {
@@ -24,13 +25,17 @@ class ColumnService
         return $this->columnRepository->createColumn($project, $name, $position);
     }
 
-    public function updateColumn(Column $column, string $name): Column
+    public function updateColumn(Project $project, Column $column, string $name): Column
     {
+        $this->assertColumnBelongsToProject($column, $project);
+
         return $this->columnRepository->updateColumn($column, $name);
     }
 
-    public function deleteColumn(Column $column): void
+    public function deleteColumn(Project $project, Column $column): void
     {
+        $this->assertColumnBelongsToProject($column, $project);
+
         $this->columnRepository->deleteColumn($column);
     }
 
@@ -40,5 +45,12 @@ class ColumnService
     public function reorderColumns(Project $project, array $columnIdsOrdered): void
     {
         $this->columnRepository->reorderColumnsForProject($project, $columnIdsOrdered);
+    }
+
+    private function assertColumnBelongsToProject(Column $column, Project $project): void
+    {
+        if ($column->project_id !== $project->id) {
+            throw new InvalidArgumentException('Column does not belong to the given project.');
+        }
     }
 }

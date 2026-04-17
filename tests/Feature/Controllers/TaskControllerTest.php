@@ -115,6 +115,38 @@ it('lets owners create update move and delete tasks', function () {
     expect(Task::query()->whereKey($task->id)->exists())->toBeFalse();
 });
 
+it('blocks task mutations when the project is archived', function () {
+    $owner = User::factory()->create();
+    $team = Team::factory()->forOwner($owner)->create();
+    $project = Project::factory()->forTeam($team)->archived()->create();
+    $columnA = Column::factory()->forProject($project)->atPosition(0)->create();
+    $columnB = Column::factory()->forProject($project)->atPosition(1)->create();
+    $task = Task::factory()->forColumn($columnA)->create();
+
+    /** @var TestCase $this */
+    $this->actingAs($owner)
+        ->post(route('teams.projects.columns.tasks.store', [$team, $project, $columnA]), [
+            'title' => 'Blocked',
+        ])
+        ->assertForbidden();
+
+    $this->actingAs($owner)
+        ->patch(route('teams.projects.tasks.update', [$team, $project, $task]), [
+            'title' => 'Blocked update',
+        ])
+        ->assertForbidden();
+
+    $this->actingAs($owner)
+        ->post(route('teams.projects.tasks.move', [$team, $project, $task]), [
+            'target_column_id' => $columnB->id,
+        ])
+        ->assertForbidden();
+
+    $this->actingAs($owner)
+        ->delete(route('teams.projects.tasks.destroy', [$team, $project, $task]))
+        ->assertForbidden();
+});
+
 it('returns 404 when the task belongs to another project in the url', function () {
     $owner = User::factory()->create();
     $team = Team::factory()->forOwner($owner)->create();

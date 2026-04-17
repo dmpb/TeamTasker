@@ -22,11 +22,11 @@ it('exposes board columns with tasks and delegates moves', function () {
             $board->firstWhere('id', $columnA->id)?->tasks->pluck('title')->all(),
         )->toBe(['Move me']);
 
-    $service->moveTaskToColumn($task, $columnB, $actor);
+    $service->moveTaskToColumn($project, $task, $columnB, $actor);
 
     expect($task->fresh()->column_id)->toBe($columnB->id);
 
-    $service->deleteTask($task, $actor);
+    $service->deleteTask($project, $task, $actor);
 
     expect(Task::query()->whereKey($task->id)->exists())->toBeFalse()
         ->and(ActivityLog::query()

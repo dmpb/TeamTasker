@@ -18,11 +18,16 @@ class CommentPolicy
      */
     public function create(User $user, Task $task): bool
     {
-        return $user->can('view', $task->project);
+        return $task->project->archived_at === null
+            && $user->can('view', $task->project);
     }
 
     public function update(User $user, Comment $comment): bool
     {
+        if ($comment->task->project->archived_at !== null) {
+            return false;
+        }
+
         if ($comment->user_id === $user->id) {
             return $user->can('view', $comment->task->project);
         }

@@ -21,11 +21,10 @@ class CommentController extends Controller
 
     public function index(Team $team, Project $project, Task $task): Response
     {
-        $this->abortUnlessTaskInProject($team, $project, $task);
-
         $this->authorize('view', $task);
         /** @var User $user */
         $user = auth()->user();
+        $canManageProject = $user->can('update', $project);
 
         $comments = $this->commentService->listTaskComments($task);
 
@@ -54,8 +53,8 @@ class CommentController extends Controller
                     'name' => $comment->user->name,
                 ],
                 'can' => [
-                    'update' => $user->can('update', $comment),
-                    'delete' => $user->can('delete', $comment),
+                    'update' => $comment->user_id === $user->id || $canManageProject,
+                    'delete' => $comment->user_id === $user->id || $canManageProject,
                 ],
             ])->values()->all(),
         ]);
@@ -63,43 +62,30 @@ class CommentController extends Controller
 
     public function store(StoreCommentRequest $request, Team $team, Project $project, Task $task): RedirectResponse
     {
-        $this->abortUnlessTaskInProject($team, $project, $task);
-
         /** @var array{ body: string } $validated */
         $validated = $request->validated();
 
-        $this->commentService->createComment($task, $request->user(), $validated['body'], $request->user());
+        $this->commentService->createComment($project, $task, $request->user(), $validated['body'], $request->user());
 
         return redirect()->route('teams.projects.tasks.comments.index', [$team, $project, $task]);
     }
 
     public function update(UpdateCommentRequest $request, Team $team, Project $project, Task $task, Comment $comment): RedirectResponse
     {
-        $this->abortUnlessTaskInProject($team, $project, $task);
-
         /** @var array{ body: string } $validated */
         $validated = $request->validated();
 
-        $this->commentService->updateComment($comment, $validated['body'], $request->user());
+        $this->commentService->updateComment($project, $task, $comment, $validated['body'], $request->user());
 
         return redirect()->route('teams.projects.tasks.comments.index', [$team, $project, $task]);
     }
 
     public function destroy(Request $request, Team $team, Project $project, Task $task, Comment $comment): RedirectResponse
     {
-        $this->abortUnlessTaskInProject($team, $project, $task);
-
-        abort_unless($comment->task_id === $task->id, 404);
-
         $this->authorize('delete', $comment);
 
-        $this->commentService->deleteComment($comment, $request->user());
+        $this->commentService->deleteComment($project, $task, $comment, $request->user());
 
         return redirect()->route('teams.projects.tasks.comments.index', [$team, $project, $task]);
-    }
-
-    private function abortUnlessTaskInProject(Team $team, Project $project, Task $task): void
-    {
-        abort_unless($project->team_id === $team->id && $task->project_id === $project->id, 404);
     }
 }

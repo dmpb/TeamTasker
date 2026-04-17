@@ -12,14 +12,14 @@ it('lists creates updates and reorders columns through the service', function ()
 
     expect($service->listProjectColumns($project)->pluck('name')->all())->toBe(['A', 'B']);
 
-    $service->updateColumn($c0, 'A1');
+    $service->updateColumn($project, $c0, 'A1');
     expect($c0->fresh()->name)->toBe('A1');
 
     $service->reorderColumns($project, [$c1->id, $c0->id]);
 
     expect($service->listProjectColumns($project)->pluck('name')->all())->toBe(['B', 'A1']);
 
-    $service->deleteColumn($c1);
+    $service->deleteColumn($project, $c1);
 
     expect($service->listProjectColumns($project)->pluck('name')->all())->toBe(['A1']);
 });

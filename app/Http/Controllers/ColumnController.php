@@ -28,8 +28,6 @@ class ColumnController extends Controller
     {
         $this->authorize('view', $project);
 
-        abort_unless($project->team_id === $team->id, 404);
-
         /** @var User|null $user */
         $user = $request->user();
 
@@ -99,8 +97,6 @@ class ColumnController extends Controller
 
     public function store(StoreColumnRequest $request, Team $team, Project $project): RedirectResponse
     {
-        abort_unless($project->team_id === $team->id, 404);
-
         /** @var array{ name: string, position?: int|null } $validated */
         $validated = $request->validated();
 
@@ -113,31 +109,25 @@ class ColumnController extends Controller
 
     public function update(UpdateColumnRequest $request, Team $team, Project $project, Column $column): RedirectResponse
     {
-        abort_unless($project->team_id === $team->id, 404);
-
         /** @var array{ name: string } $validated */
         $validated = $request->validated();
 
-        $this->columnService->updateColumn($column, $validated['name']);
+        $this->columnService->updateColumn($project, $column, $validated['name']);
 
         return redirect()->route('teams.projects.board', [$team, $project]);
     }
 
     public function destroy(Team $team, Project $project, Column $column): RedirectResponse
     {
-        abort_unless($project->team_id === $team->id, 404);
-
         $this->authorize('delete', $column);
 
-        $this->columnService->deleteColumn($column);
+        $this->columnService->deleteColumn($project, $column);
 
         return redirect()->route('teams.projects.board', [$team, $project]);
     }
 
     public function reorder(ReorderColumnsRequest $request, Team $team, Project $project): RedirectResponse
     {
-        abort_unless($project->team_id === $team->id, 404);
-
         /** @var array{ column_ids: list<int|string> } $validated */
         $validated = $request->validated();
 

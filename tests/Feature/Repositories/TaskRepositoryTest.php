@@ -5,6 +5,8 @@ use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
 use App\Repositories\TaskRepository;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 
 it('creates a task when the column belongs to the project', function () {
     $project = Project::factory()->create();
@@ -28,6 +30,25 @@ it('throws when creating a task for a column outside the project', function () {
 
     expect(fn () => $repository->createTask($projectOne, $columnOnTwo, 'X'))
         ->toThrow(InvalidArgumentException::class);
+});
+
+it('enforces project and column integrity at the database level', function () {
+    $projectOne = Project::factory()->create();
+    $projectTwo = Project::factory()->create();
+    $columnOnTwo = Column::factory()->forProject($projectTwo)->create();
+
+    expect(function () use ($projectOne, $columnOnTwo): void {
+        DB::table('tasks')->insert([
+            'project_id' => $projectOne->id,
+            'column_id' => $columnOnTwo->id,
+            'assignee_id' => null,
+            'title' => 'Invalid',
+            'description' => null,
+            'position' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    })->toThrow(QueryException::class);
 });
 
 it('moves a task to another column in the same project', function () {

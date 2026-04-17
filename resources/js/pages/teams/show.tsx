@@ -1,5 +1,4 @@
 import { Form, Head, Link, usePage } from '@inertiajs/react';
-import TeamController from '@/actions/App/Http/Controllers/TeamController';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -7,6 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import AppLayout from '@/layouts/app-layout';
+import {
+    destroy as destroyTeamMember,
+    store as storeTeamMember,
+    update as updateTeamMember,
+} from '@/routes/teams/members';
 import { index as teamsIndex, show as teamsShow } from '@/routes/teams';
 import { index as teamProjectsIndex } from '@/routes/teams/projects';
 import type { BreadcrumbItem } from '@/types';
@@ -94,7 +98,7 @@ export default function TeamShow() {
                             already be registered in the app.
                         </p>
                         <Form
-                            {...TeamController.storeMember.form({
+                            {...storeTeamMember.form({
                                 team: team.id,
                             })}
                             options={{
@@ -211,10 +215,10 @@ export default function TeamShow() {
                                         <div className="flex flex-col gap-3 sm:min-w-[220px] sm:items-end">
                                             {row.can_update_role && (
                                                 <Form
-                                                    {...TeamController.updateMember.form(
+                                                    {...updateTeamMember.form(
                                                         {
                                                             team: team.id,
-                                                            user: row.user.id,
+                                                            member: row.id,
                                                         },
                                                     )}
                                                     options={{
@@ -276,10 +280,10 @@ export default function TeamShow() {
                                             )}
                                             {row.can_remove && (
                                                 <Form
-                                                    {...TeamController.destroyMember.form(
+                                                    {...destroyTeamMember.form(
                                                         {
                                                             team: team.id,
-                                                            user: row.user.id,
+                                                            member: row.id,
                                                         },
                                                     )}
                                                     options={{

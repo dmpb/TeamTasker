@@ -8,6 +8,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Repositories\TaskRepository;
 use Illuminate\Database\Eloquent\Collection;
+use InvalidArgumentException;
 
 class TaskService
 {
@@ -50,20 +51,25 @@ class TaskService
     }
 
     public function updateTask(
+        Project $project,
         Task $task,
         string $title,
         ?string $description = null,
         ?User $assignee = null,
         ?User $actor = null,
     ): Task {
+        $this->assertTaskBelongsToProject($task, $project);
+
         $updatedTask = $this->taskRepository->updateTask($task, $title, $description, $assignee);
         $this->activityLogService->recordTaskUpdated($updatedTask, $actor);
 
         return $updatedTask;
     }
 
-    public function moveTaskToColumn(Task $task, Column $targetColumn, ?User $actor = null): Task
+    public function moveTaskToColumn(Project $project, Task $task, Column $targetColumn, ?User $actor = null): Task
     {
+        $this->assertTaskBelongsToProject($task, $project);
+
         $fromColumnId = $task->column_id;
         $movedTask = $this->taskRepository->moveTaskToColumn($task, $targetColumn);
 
@@ -74,9 +80,18 @@ class TaskService
         return $movedTask;
     }
 
-    public function deleteTask(Task $task, ?User $actor = null): void
+    public function deleteTask(Project $project, Task $task, ?User $actor = null): void
     {
+        $this->assertTaskBelongsToProject($task, $project);
+
         $this->activityLogService->recordTaskDeleted($task, $actor);
         $this->taskRepository->deleteTask($task);
+    }
+
+    private function assertTaskBelongsToProject(Task $task, Project $project): void
+    {
+        if ($task->project_id !== $project->id) {
+            throw new InvalidArgumentException('Task does not belong to the given project.');
+        }
     }
 }

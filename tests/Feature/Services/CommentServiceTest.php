@@ -19,8 +19,8 @@ it('manages comments for a task in a known team project', function () {
     $task = Task::factory()->forColumn($column)->create();
     $service = app(CommentService::class);
 
-    $created = $service->createComment($task, $member, 'Looks good');
-    $service->createComment($task, $owner, 'Ship it');
+    $created = $service->createComment($project, $task, $member, 'Looks good');
+    $service->createComment($project, $task, $owner, 'Ship it');
 
     $list = $service->listTaskComments($task);
 
@@ -28,10 +28,10 @@ it('manages comments for a task in a known team project', function () {
         ->and($list->first()->body)->toBe('Looks good')
         ->and($list->first()->user->id)->toBe($member->id);
 
-    $updated = $service->updateComment($created, 'Looks really good');
+    $updated = $service->updateComment($project, $task, $created, 'Looks really good');
     expect($updated->body)->toBe('Looks really good');
 
-    $service->deleteComment($updated);
+    $service->deleteComment($project, $task, $updated);
     expect($service->listTaskComments($task))->toHaveCount(1)
         ->and(ActivityLog::query()
             ->where('project_id', $project->id)
