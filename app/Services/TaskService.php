@@ -22,9 +22,18 @@ class TaskService
      *
      * @return Collection<int, Column>
      */
-    public function boardColumnsWithTasks(Project $project): Collection
-    {
-        return $this->taskRepository->listColumnsWithTasksOrderedForProject($project);
+    public function boardColumnsWithTasks(
+        Project $project,
+        ?int $columnId = null,
+        ?int $assigneeId = null,
+        ?string $titleQuery = null,
+    ): Collection {
+        return $this->taskRepository->listColumnsWithTasksOrderedForProject(
+            $project,
+            $columnId,
+            $assigneeId,
+            $titleQuery,
+        );
     }
 
     /**

@@ -34,6 +34,9 @@ class ReorderColumnsRequest extends FormRequest
         return [
             'column_ids' => ['required', 'array'],
             'column_ids.*' => ['integer'],
+            'search' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'filter_column' => ['sometimes', 'nullable', 'integer'],
+            'filter_assignee' => ['sometimes', 'nullable', 'integer'],
         ];
     }
 

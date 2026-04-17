@@ -17,9 +17,24 @@ class ActivityLogService
     /**
      * @return Collection<int, ActivityLog>
      */
-    public function listProjectLogs(Project $project, int $limit = 50): Collection
-    {
-        return $this->activityLogRepository->listForProject($project, $limit);
+    public function listProjectLogs(
+        Project $project,
+        int $limit = 50,
+        ?string $event = null,
+        ?int $actorId = null,
+        ?string $dateFrom = null,
+        ?string $dateTo = null,
+        ?string $query = null,
+    ): Collection {
+        return $this->activityLogRepository->listForProject(
+            $project,
+            $limit,
+            $event,
+            $actorId,
+            $dateFrom,
+            $dateTo,
+            $query,
+        );
     }
 
     public function recordTaskCreated(Task $task, ?User $actor = null): void

@@ -1,4 +1,6 @@
-import { Form, Head, Link, usePage } from '@inertiajs/react';
+import { Form, Head, Link, router, usePage } from '@inertiajs/react';
+import { useState } from 'react';
+import { ConfirmDestructiveDialog } from '@/components/confirm-destructive-dialog';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -49,6 +51,8 @@ export default function TeamShow() {
     const page = usePage<TeamShowProps & { errors: PageErrors }>();
     const { team, members, can } = page.props;
     const { errors } = page.props;
+
+    const [memberPendingRemove, setMemberPendingRemove] = useState<MemberRow | null>(null);
 
     const breadcrumbs: BreadcrumbItem[] = [
         {
@@ -279,39 +283,17 @@ export default function TeamShow() {
                                                 </Form>
                                             )}
                                             {row.can_remove && (
-                                                <Form
-                                                    {...destroyTeamMember.form(
-                                                        {
-                                                            team: team.id,
-                                                            member: row.id,
-                                                        },
-                                                    )}
-                                                    options={{
-                                                        preserveScroll: true,
-                                                    }}
-                                                    onBefore={() =>
-                                                        window.confirm(
-                                                            `Remove ${row.user.name} from this team?`,
-                                                        )
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="destructive"
+                                                    data-test={`remove-member-${row.user.id}`}
+                                                    onClick={() =>
+                                                        setMemberPendingRemove(row)
                                                     }
                                                 >
-                                                    {({ processing }) => (
-                                                        <Button
-                                                            type="submit"
-                                                            size="sm"
-                                                            variant="destructive"
-                                                            disabled={
-                                                                processing
-                                                            }
-                                                            data-test={`remove-member-${row.user.id}`}
-                                                        >
-                                                            {processing && (
-                                                                <Spinner />
-                                                            )}
-                                                            Remove
-                                                        </Button>
-                                                    )}
-                                                </Form>
+                                                    Remove
+                                                </Button>
                                             )}
                                         </div>
                                     )}
@@ -321,6 +303,36 @@ export default function TeamShow() {
                     </ul>
                 </section>
             </div>
+
+            <ConfirmDestructiveDialog
+                open={memberPendingRemove !== null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setMemberPendingRemove(null);
+                    }
+                }}
+                title="Remove member"
+                description={
+                    memberPendingRemove
+                        ? `Remove ${memberPendingRemove.user.name} from this team? They will lose access to projects in this team.`
+                        : ''
+                }
+                confirmLabel="Remove"
+                onConfirm={() => {
+                    const m = memberPendingRemove;
+                    if (!m) {
+                        return;
+                    }
+                    setMemberPendingRemove(null);
+                    router.delete(
+                        destroyTeamMember.url({
+                            team: team.id,
+                            member: m.id,
+                        }),
+                        { preserveScroll: true },
+                    );
+                }}
+            />
         </AppLayout>
     );
 }

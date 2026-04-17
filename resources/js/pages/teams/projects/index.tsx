@@ -1,6 +1,8 @@
-import { Form, Head, Link, usePage } from '@inertiajs/react';
+import { Form, Head, Link, router, usePage } from '@inertiajs/react';
+import { useEffect, useState } from 'react';
 import { FolderKanban } from 'lucide-react';
 import ProjectController from '@/actions/App/Http/Controllers/ProjectController';
+import { ConfirmDestructiveDialog } from '@/components/confirm-destructive-dialog';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -32,11 +34,21 @@ type TeamProjectsPageProps = {
         manageProjects: boolean;
         showArchived: boolean;
     };
+    filters: {
+        q: string;
+    };
 };
 
 export default function TeamProjectsIndex() {
     const page = usePage<TeamProjectsPageProps>();
-    const { team, projects, can } = page.props;
+    const { team, projects, can, filters } = page.props;
+
+    const [draftQ, setDraftQ] = useState(filters.q);
+    const [projectPendingDelete, setProjectPendingDelete] = useState<ProjectRow | null>(null);
+
+    useEffect(() => {
+        setDraftQ(filters.q);
+    }, [filters.q]);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Teams', href: teamsIndex() },
@@ -52,6 +64,34 @@ export default function TeamProjectsIndex() {
         { query: { include_archived: '1' } },
     );
     const activeListUrl = teamProjectsIndex.url({ team: team.id });
+
+    const applyProjectSearch = (): void => {
+        const query: Record<string, string> = {};
+        if (draftQ.trim() !== '') {
+            query.q = draftQ.trim();
+        }
+        if (can.showArchived) {
+            query.include_archived = '1';
+        }
+        router.get(
+            teamProjectsIndex.url({ team: team.id }, { query: Object.keys(query).length ? query : undefined }),
+            {},
+            { preserveScroll: true, replace: true },
+        );
+    };
+
+    const clearProjectSearch = (): void => {
+        setDraftQ('');
+        const query: Record<string, string> = {};
+        if (can.showArchived) {
+            query.include_archived = '1';
+        }
+        router.get(
+            teamProjectsIndex.url({ team: team.id }, { query: Object.keys(query).length ? query : undefined }),
+            {},
+            { preserveScroll: true, replace: true },
+        );
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -92,6 +132,27 @@ export default function TeamProjectsIndex() {
                         )}
                     </div>
                 </div>
+
+                <section className="flex flex-col gap-3 rounded-md border border-sidebar-border/70 p-4 sm:flex-row sm:items-end dark:border-sidebar-border">
+                    <div className="grid max-w-md flex-1 gap-2">
+                        <Label htmlFor="project-search">Search projects</Label>
+                        <Input
+                            id="project-search"
+                            value={draftQ}
+                            onChange={(e) => setDraftQ(e.target.value)}
+                            placeholder="Filter by name…"
+                            maxLength={255}
+                        />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        <Button type="button" size="sm" onClick={applyProjectSearch}>
+                            Search
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" onClick={clearProjectSearch}>
+                            Clear
+                        </Button>
+                    </div>
+                </section>
 
                 {can.manageProjects && (
                     <section className="max-w-md space-y-4 rounded-md border border-sidebar-border/70 p-4 dark:border-sidebar-border">
@@ -308,39 +369,17 @@ export default function TeamProjectsIndex() {
                                                         )}
                                                     </Form>
                                                 )}
-                                                <Form
-                                                    {...ProjectController.destroy.form(
-                                                        {
-                                                            team: team.id,
-                                                            project: row.id,
-                                                        },
-                                                    )}
-                                                    options={{
-                                                        preserveScroll: true,
-                                                    }}
-                                                    onBefore={() =>
-                                                        window.confirm(
-                                                            `Permanently delete “${row.name}”?`,
-                                                        )
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="destructive"
+                                                    data-test={`delete-project-${row.id}`}
+                                                    onClick={() =>
+                                                        setProjectPendingDelete(row)
                                                     }
                                                 >
-                                                    {({ processing }) => (
-                                                        <Button
-                                                            type="submit"
-                                                            size="sm"
-                                                            variant="destructive"
-                                                            disabled={
-                                                                processing
-                                                            }
-                                                            data-test={`delete-project-${row.id}`}
-                                                        >
-                                                            {processing && (
-                                                                <Spinner />
-                                                            )}
-                                                            Delete
-                                                        </Button>
-                                                    )}
-                                                </Form>
+                                                    Delete
+                                                </Button>
                                             </div>
                                         </div>
                                     )}
@@ -359,6 +398,36 @@ export default function TeamProjectsIndex() {
                     </Link>
                 </p>
             </div>
+
+            <ConfirmDestructiveDialog
+                open={projectPendingDelete !== null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setProjectPendingDelete(null);
+                    }
+                }}
+                title="Delete project"
+                description={
+                    projectPendingDelete
+                        ? `Permanently delete “${projectPendingDelete.name}”? This cannot be undone.`
+                        : ''
+                }
+                confirmLabel="Delete project"
+                onConfirm={() => {
+                    const p = projectPendingDelete;
+                    if (!p) {
+                        return;
+                    }
+                    setProjectPendingDelete(null);
+                    router.delete(
+                        ProjectController.destroy.url({
+                            team: team.id,
+                            project: p.id,
+                        }),
+                        { preserveScroll: true },
+                    );
+                }}
+            />
         </AppLayout>
     );
 }

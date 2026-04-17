@@ -37,6 +37,9 @@ class MoveTaskRequest extends FormRequest
     {
         return [
             'target_column_id' => ['required', 'integer', 'exists:board_columns,id'],
+            'search' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'filter_column' => ['sometimes', 'nullable', 'integer'],
+            'filter_assignee' => ['sometimes', 'nullable', 'integer'],
         ];
     }
 

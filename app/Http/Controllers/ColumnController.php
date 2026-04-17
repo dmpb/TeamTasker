@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\BuildsBoardRedirectUrl;
+use App\Http\Requests\BoardFilterRequest;
 use App\Http\Requests\ReorderColumnsRequest;
 use App\Http\Requests\StoreColumnRequest;
 use App\Http\Requests\UpdateColumnRequest;
@@ -19,19 +21,29 @@ use Inertia\Response;
 
 class ColumnController extends Controller
 {
+    use BuildsBoardRedirectUrl;
+
     public function __construct(
         protected ColumnService $columnService,
         protected TaskService $taskService,
     ) {}
 
-    public function board(Request $request, Team $team, Project $project): Response
+    public function board(BoardFilterRequest $request, Team $team, Project $project): Response
     {
         $this->authorize('view', $project);
 
         /** @var User|null $user */
         $user = $request->user();
 
-        $columns = $this->taskService->boardColumnsWithTasks($project);
+        /** @var array{ filter_column?: int|null, filter_assignee?: int|null, search?: string|null } $filters */
+        $filters = $request->validated();
+
+        $columns = $this->taskService->boardColumnsWithTasks(
+            $project,
+            $filters['filter_column'] ?? null,
+            $filters['filter_assignee'] ?? null,
+            $filters['search'] ?? null,
+        );
 
         $canManageTasks = $user?->can('update', $project) ?? false;
 
@@ -70,6 +82,11 @@ class ColumnController extends Controller
                 'manageColumns' => $user?->can('update', $project) ?? false,
                 'manageTasks' => $canManageTasks,
             ],
+            'filters' => [
+                'filter_column' => $filters['filter_column'] ?? null,
+                'filter_assignee' => $filters['filter_assignee'] ?? null,
+                'search' => $filters['search'] ?? '',
+            ],
         ]);
     }
 
@@ -104,7 +121,8 @@ class ColumnController extends Controller
 
         $this->columnService->createColumn($project, $validated['name'], $position);
 
-        return redirect()->route('teams.projects.board', [$team, $project]);
+        return redirect()->to($this->boardUrlWithFilters($team, $project, $request))
+            ->with('success', __('Column added.'));
     }
 
     public function update(UpdateColumnRequest $request, Team $team, Project $project, Column $column): RedirectResponse
@@ -114,16 +132,18 @@ class ColumnController extends Controller
 
         $this->columnService->updateColumn($project, $column, $validated['name']);
 
-        return redirect()->route('teams.projects.board', [$team, $project]);
+        return redirect()->to($this->boardUrlWithFilters($team, $project, $request))
+            ->with('success', __('Column updated.'));
     }
 
-    public function destroy(Team $team, Project $project, Column $column): RedirectResponse
+    public function destroy(Request $request, Team $team, Project $project, Column $column): RedirectResponse
     {
         $this->authorize('delete', $column);
 
         $this->columnService->deleteColumn($project, $column);
 
-        return redirect()->route('teams.projects.board', [$team, $project]);
+        return redirect()->to($this->boardUrlWithFilters($team, $project, $request))
+            ->with('success', __('Column deleted.'));
     }
 
     public function reorder(ReorderColumnsRequest $request, Team $team, Project $project): RedirectResponse
@@ -133,6 +153,7 @@ class ColumnController extends Controller
 
         $this->columnService->reorderColumns($project, $validated['column_ids']);
 
-        return redirect()->route('teams.projects.board', [$team, $project]);
+        return redirect()->to($this->boardUrlWithFilters($team, $project, $request))
+            ->with('success', __('Columns reordered.'));
     }
 }

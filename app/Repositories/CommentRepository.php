@@ -12,13 +12,19 @@ class CommentRepository
     /**
      * @return Collection<int, Comment>
      */
-    public function listCommentsForTask(Task $task): Collection
+    public function listCommentsForTask(Task $task, ?string $bodySearch = null): Collection
     {
-        return Comment::query()
+        $query = Comment::query()
             ->where('task_id', $task->id)
             ->with(['user', 'task.project'])
-            ->orderBy('id')
-            ->get();
+            ->orderBy('id');
+
+        if ($bodySearch !== null && $bodySearch !== '') {
+            $escaped = addcslashes($bodySearch, '%_\\');
+            $query->where('body', 'like', '%'.$escaped.'%');
+        }
+
+        return $query->get();
     }
 
     public function createComment(Task $task, User $user, string $body): Comment

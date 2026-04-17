@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\CommentIndexFilterRequest;
 use App\Http\Requests\StoreCommentRequest;
 use App\Http\Requests\UpdateCommentRequest;
 use App\Models\Comment;
@@ -19,14 +20,18 @@ class CommentController extends Controller
 {
     public function __construct(protected CommentService $commentService) {}
 
-    public function index(Team $team, Project $project, Task $task): Response
+    public function index(CommentIndexFilterRequest $request, Team $team, Project $project, Task $task): Response
     {
         $this->authorize('view', $task);
         /** @var User $user */
         $user = auth()->user();
         $canManageProject = $user->can('update', $project);
 
-        $comments = $this->commentService->listTaskComments($task);
+        /** @var array{ q?: string|null } $validated */
+        $validated = $request->validated();
+        $bodySearch = $validated['q'] ?? null;
+
+        $comments = $this->commentService->listTaskComments($task, $bodySearch);
 
         return Inertia::render('teams/projects/tasks/comments', [
             'team' => [
@@ -57,6 +62,9 @@ class CommentController extends Controller
                     'delete' => $comment->user_id === $user->id || $canManageProject,
                 ],
             ])->values()->all(),
+            'filters' => [
+                'q' => $bodySearch ?? '',
+            ],
         ]);
     }
 
@@ -67,7 +75,7 @@ class CommentController extends Controller
 
         $this->commentService->createComment($project, $task, $request->user(), $validated['body'], $request->user());
 
-        return redirect()->route('teams.projects.tasks.comments.index', [$team, $project, $task]);
+        return back()->with('success', __('Comment published.'));
     }
 
     public function update(UpdateCommentRequest $request, Team $team, Project $project, Task $task, Comment $comment): RedirectResponse
@@ -77,7 +85,7 @@ class CommentController extends Controller
 
         $this->commentService->updateComment($project, $task, $comment, $validated['body'], $request->user());
 
-        return redirect()->route('teams.projects.tasks.comments.index', [$team, $project, $task]);
+        return back()->with('success', __('Comment updated.'));
     }
 
     public function destroy(Request $request, Team $team, Project $project, Task $task, Comment $comment): RedirectResponse
@@ -86,6 +94,6 @@ class CommentController extends Controller
 
         $this->commentService->deleteComment($project, $task, $comment, $request->user());
 
-        return redirect()->route('teams.projects.tasks.comments.index', [$team, $project, $task]);
+        return back()->with('success', __('Comment deleted.'));
     }
 }

@@ -33,6 +33,9 @@ class StoreColumnRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'position' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'search' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'filter_column' => ['sometimes', 'nullable', 'integer'],
+            'filter_assignee' => ['sometimes', 'nullable', 'integer'],
         ];
     }
 }

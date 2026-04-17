@@ -74,7 +74,31 @@ it('shows the board with columns for a team member', function () {
             ->has('columns', 1)
             ->where('columns.0.name', 'Todo')
             ->has('columns.0.tasks', 0)
-            ->has('assignableUsers', 1));
+            ->has('assignableUsers', 1)
+            ->has('filters')
+            ->where('filters.search', '')
+            ->where('filters.filter_column', null)
+            ->where('filters.filter_assignee', null));
+});
+
+it('echoes board filter query params in inertia props', function () {
+    $owner = User::factory()->create();
+    $team = app(TeamService::class)->createTeam($owner, ['name' => 'Acme']);
+    $project = Project::factory()->forTeam($team)->create(['name' => 'Sprint']);
+    $column = Column::factory()->forProject($project)->atPosition(0)->create(['name' => 'Todo']);
+
+    $query = http_build_query([
+        'search' => 'fix bug',
+        'filter_column' => (string) $column->id,
+    ]);
+
+    /** @var TestCase $this */
+    $this->actingAs($owner)
+        ->get(route('teams.projects.board', [$team, $project]).'?'.$query)
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('filters.search', 'fix bug')
+            ->where('filters.filter_column', $column->id));
 });
 
 it('allows plain members to view the board but not mutate columns', function () {

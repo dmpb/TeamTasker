@@ -5,9 +5,11 @@ import {
     router,
     usePage,
 } from '@inertiajs/react';
+import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, LayoutGrid, Trash2 } from 'lucide-react';
 import ColumnController from '@/actions/App/Http/Controllers/ColumnController';
 import TaskController from '@/actions/App/Http/Controllers/TaskController';
+import { ConfirmDestructiveDialog } from '@/components/confirm-destructive-dialog';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
@@ -21,6 +23,7 @@ import { index as projectActivityIndex } from '@/routes/teams/projects/activity/
 import { board as projectBoard, index as teamProjectsIndex } from '@/routes/teams/projects';
 import { index as taskCommentsIndex } from '@/routes/teams/projects/tasks/comments/index';
 import type { BreadcrumbItem } from '@/types';
+import { BoardFilterHiddenFields } from '@/pages/teams/projects/board-filter-hidden-fields';
 
 const textareaClass = cn(
     'border-input placeholder:text-muted-foreground flex min-h-[4rem] w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none',
@@ -65,6 +68,11 @@ type ProjectBoardPageProps = {
         manageColumns: boolean;
         manageTasks: boolean;
     };
+    filters: {
+        filter_column: number | null;
+        filter_assignee: number | null;
+        search: string;
+    };
 };
 
 function swapColumnOrder(ids: number[], index: number, direction: -1 | 1): number[] {
@@ -80,7 +88,24 @@ function swapColumnOrder(ids: number[], index: number, direction: -1 | 1): numbe
 
 export default function ProjectBoard() {
     const page = usePage<ProjectBoardPageProps>();
-    const { team, project, columns, assignableUsers, can } = page.props;
+    const { team, project, columns, assignableUsers, can, filters } = page.props;
+
+    const [taskPendingDelete, setTaskPendingDelete] = useState<TaskRow | null>(null);
+    const [columnPendingDelete, setColumnPendingDelete] = useState<ColumnRow | null>(null);
+
+    const [draftSearch, setDraftSearch] = useState(filters.search);
+    const [draftColumn, setDraftColumn] = useState<string>(
+        filters.filter_column != null ? String(filters.filter_column) : '',
+    );
+    const [draftAssignee, setDraftAssignee] = useState<string>(
+        filters.filter_assignee != null ? String(filters.filter_assignee) : '',
+    );
+
+    useEffect(() => {
+        setDraftSearch(filters.search);
+        setDraftColumn(filters.filter_column != null ? String(filters.filter_column) : '');
+        setDraftAssignee(filters.filter_assignee != null ? String(filters.filter_assignee) : '');
+    }, [filters.search, filters.filter_column, filters.filter_assignee]);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Teams', href: teamsIndex() },
@@ -98,13 +123,54 @@ export default function ProjectBoard() {
     const columnIds = columns.map((c) => c.id);
 
     const submitReorder = (newOrder: number[]): void => {
+        const payload: Record<string, string | number | number[]> = {
+            column_ids: newOrder,
+        };
+        if (filters.search) {
+            payload.search = filters.search;
+        }
+        if (filters.filter_column != null) {
+            payload.filter_column = filters.filter_column;
+        }
+        if (filters.filter_assignee != null) {
+            payload.filter_assignee = filters.filter_assignee;
+        }
+
         router.post(
             ColumnController.reorder.url({
                 team: team.id,
                 project: project.id,
             }),
-            { column_ids: newOrder },
+            payload,
             { preserveScroll: true },
+        );
+    };
+
+    const applyBoardFilters = (): void => {
+        router.get(
+            projectBoard.url(
+                { team: team.id, project: project.id },
+                {
+                    query: {
+                        ...(draftSearch.trim() !== '' ? { search: draftSearch.trim() } : {}),
+                        ...(draftColumn !== '' ? { filter_column: draftColumn } : {}),
+                        ...(draftAssignee !== '' ? { filter_assignee: draftAssignee } : {}),
+                    },
+                },
+            ),
+            {},
+            { preserveScroll: true, replace: true },
+        );
+    };
+
+    const clearBoardFilters = (): void => {
+        setDraftSearch('');
+        setDraftColumn('');
+        setDraftAssignee('');
+        router.get(
+            projectBoard.url({ team: team.id, project: project.id }),
+            {},
+            { preserveScroll: true, replace: true },
         );
     };
 
@@ -140,6 +206,62 @@ export default function ProjectBoard() {
                     </Link>
                 </div>
 
+                <section className="flex flex-col gap-4 rounded-md border border-sidebar-border/70 p-4 dark:border-sidebar-border lg:flex-row lg:flex-wrap lg:items-end">
+                    <div className="grid min-w-[10rem] flex-1 gap-2">
+                        <Label htmlFor="board-search">Search titles</Label>
+                        <Input
+                            id="board-search"
+                            value={draftSearch}
+                            onChange={(e) => setDraftSearch(e.target.value)}
+                            placeholder="Filter by title…"
+                            maxLength={255}
+                            className="max-w-md"
+                        />
+                    </div>
+                    <div className="grid min-w-[10rem] flex-1 gap-2">
+                        <Label htmlFor="board-column">Column</Label>
+                        <select
+                            id="board-column"
+                            value={draftColumn}
+                            onChange={(e) => setDraftColumn(e.target.value)}
+                            className="border-input bg-background h-9 w-full max-w-md rounded-md border px-2 text-sm"
+                        >
+                            <option value="">All columns</option>
+                            {columns.map((c) => (
+                                <option key={c.id} value={String(c.id)}>
+                                    {c.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    {assignableUsers.length > 0 && (
+                        <div className="grid min-w-[10rem] flex-1 gap-2">
+                            <Label htmlFor="board-assignee">Assignee</Label>
+                            <select
+                                id="board-assignee"
+                                value={draftAssignee}
+                                onChange={(e) => setDraftAssignee(e.target.value)}
+                                className="border-input bg-background h-9 w-full max-w-md rounded-md border px-2 text-sm"
+                            >
+                                <option value="">Anyone</option>
+                                {assignableUsers.map((u) => (
+                                    <option key={u.id} value={String(u.id)}>
+                                        {u.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                        <Button type="button" size="sm" onClick={applyBoardFilters}>
+                            Apply filters
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" onClick={clearBoardFilters}>
+                            Clear
+                        </Button>
+                    </div>
+                </section>
+
                 {can.manageColumns && (
                     <section className="max-w-md space-y-4 rounded-md border border-sidebar-border/70 p-4 dark:border-sidebar-border">
                         <h2 className="text-sm font-medium text-muted-foreground">
@@ -156,6 +278,7 @@ export default function ProjectBoard() {
                         >
                             {({ processing, errors }) => (
                                 <>
+                                    <BoardFilterHiddenFields />
                                     <div className="grid gap-2">
                                         <Label htmlFor="column-name">Name</Label>
                                         <Input
@@ -262,6 +385,7 @@ export default function ProjectBoard() {
                                                                         errors: ue,
                                                                     }) => (
                                                                         <>
+                                                                            <BoardFilterHiddenFields />
                                                                             <div className="grid gap-1">
                                                                                 <Label
                                                                                     className="text-xs"
@@ -399,6 +523,7 @@ export default function ProjectBoard() {
                                                                             errors: moveErrors,
                                                                         }) => (
                                                                             <>
+                                                                                <BoardFilterHiddenFields />
                                                                                 <Label
                                                                                     className="text-xs text-muted-foreground"
                                                                                     htmlFor={`move-task-${task.id}`}
@@ -461,49 +586,23 @@ export default function ProjectBoard() {
                                                                         )}
                                                                     </Form>
                                                                 )}
-                                                                <Form
-                                                                    {...TaskController.destroy.form(
-                                                                        {
-                                                                            team: team.id,
-                                                                            project:
-                                                                                project.id,
-                                                                            task: task.id,
-                                                                        },
-                                                                    )}
-                                                                    options={{
-                                                                        preserveScroll:
-                                                                            true,
-                                                                    }}
-                                                                    onBefore={() =>
-                                                                        window.confirm(
-                                                                            `Delete task “${task.title}”?`,
-                                                                        )
-                                                                    }
-                                                                    className="border-t border-border/60 pt-2"
-                                                                >
-                                                                    {({
-                                                                        processing,
-                                                                    }) => (
-                                                                        <Button
-                                                                            type="submit"
-                                                                            size="sm"
-                                                                            variant="destructive"
-                                                                            disabled={
-                                                                                processing
-                                                                            }
-                                                                            className="w-full gap-1"
-                                                                        >
-                                                                            {processing && (
-                                                                                <Spinner />
-                                                                            )}
-                                                                            <Trash2
-                                                                                className="size-3.5"
-                                                                                aria-hidden
-                                                                            />
-                                                                            Delete task
-                                                                        </Button>
-                                                                    )}
-                                                                </Form>
+                                                                <div className="border-t border-border/60 pt-2">
+                                                                    <Button
+                                                                        type="button"
+                                                                        size="sm"
+                                                                        variant="destructive"
+                                                                        className="w-full gap-1"
+                                                                        onClick={() =>
+                                                                            setTaskPendingDelete(task)
+                                                                        }
+                                                                    >
+                                                                        <Trash2
+                                                                            className="size-3.5"
+                                                                            aria-hidden
+                                                                        />
+                                                                        Delete task
+                                                                    </Button>
+                                                                </div>
                                                             </div>
                                                         ) : (
                                                             <>
@@ -550,6 +649,7 @@ export default function ProjectBoard() {
                                             >
                                                 {({ processing, errors: te }) => (
                                                     <>
+                                                        <BoardFilterHiddenFields />
                                                         <div className="grid gap-1">
                                                             <Label
                                                                 className="sr-only"
@@ -648,6 +748,7 @@ export default function ProjectBoard() {
                                             >
                                                 {({ processing, errors: fe }) => (
                                                     <>
+                                                        <BoardFilterHiddenFields />
                                                         <div className="grid gap-1">
                                                             <Label
                                                                 className="sr-only"
@@ -728,43 +829,19 @@ export default function ProjectBoard() {
                                                         />
                                                     </Button>
                                                 </div>
-                                                <Form
-                                                    {...ColumnController.destroy.form(
-                                                        {
-                                                            team: team.id,
-                                                            project: project.id,
-                                                            column: col.id,
-                                                        },
-                                                    )}
-                                                    options={{
-                                                        preserveScroll: true,
-                                                    }}
-                                                    onBefore={() =>
-                                                        window.confirm(
-                                                            `Delete column “${col.name}”?`,
-                                                        )
-                                                    }
-                                                    className="inline"
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="destructive"
+                                                    className="gap-1"
+                                                    onClick={() => setColumnPendingDelete(col)}
                                                 >
-                                                    {({ processing }) => (
-                                                        <Button
-                                                            type="submit"
-                                                            size="sm"
-                                                            variant="destructive"
-                                                            disabled={processing}
-                                                            className="gap-1"
-                                                        >
-                                                            {processing && (
-                                                                <Spinner />
-                                                            )}
-                                                            <Trash2
-                                                                className="size-3.5"
-                                                                aria-hidden
-                                                            />
-                                                            Delete
-                                                        </Button>
-                                                    )}
-                                                </Form>
+                                                    <Trash2
+                                                        className="size-3.5"
+                                                        aria-hidden
+                                                    />
+                                                    Delete
+                                                </Button>
                                             </div>
                                         </div>
                                     )}
@@ -774,6 +851,68 @@ export default function ProjectBoard() {
                     )}
                 </section>
             </div>
+
+            <ConfirmDestructiveDialog
+                open={taskPendingDelete !== null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setTaskPendingDelete(null);
+                    }
+                }}
+                title="Delete task"
+                description={
+                    taskPendingDelete
+                        ? `Delete “${taskPendingDelete.title}”? This cannot be undone.`
+                        : ''
+                }
+                confirmLabel="Delete task"
+                onConfirm={() => {
+                    const t = taskPendingDelete;
+                    if (!t) {
+                        return;
+                    }
+                    setTaskPendingDelete(null);
+                    router.delete(
+                        TaskController.destroy.url({
+                            team: team.id,
+                            project: project.id,
+                            task: t.id,
+                        }),
+                        { preserveScroll: true },
+                    );
+                }}
+            />
+
+            <ConfirmDestructiveDialog
+                open={columnPendingDelete !== null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setColumnPendingDelete(null);
+                    }
+                }}
+                title="Delete column"
+                description={
+                    columnPendingDelete
+                        ? `Delete column “${columnPendingDelete.name}” and all tasks inside? This cannot be undone.`
+                        : ''
+                }
+                confirmLabel="Delete column"
+                onConfirm={() => {
+                    const c = columnPendingDelete;
+                    if (!c) {
+                        return;
+                    }
+                    setColumnPendingDelete(null);
+                    router.delete(
+                        ColumnController.destroy.url({
+                            team: team.id,
+                            project: project.id,
+                            column: c.id,
+                        }),
+                        { preserveScroll: true },
+                    );
+                }}
+            />
         </AppLayout>
     );
 }

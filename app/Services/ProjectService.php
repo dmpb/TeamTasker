@@ -14,9 +14,9 @@ class ProjectService
     /**
      * @return Collection<int, Project>
      */
-    public function listTeamProjects(Team $team, bool $includeArchived = false): Collection
+    public function listTeamProjects(Team $team, bool $includeArchived = false, ?string $nameSearch = null): Collection
     {
-        return $this->projectRepository->listProjectsForTeam($team, $includeArchived);
+        return $this->projectRepository->listProjectsForTeam($team, $includeArchived, $nameSearch);
     }
 
     public function createProject(Team $team, string $name): Project

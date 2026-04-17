@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\IndexTeamProjectsRequest;
 use App\Http\Requests\StoreProjectRequest;
 use App\Http\Requests\UpdateProjectRequest;
 use App\Models\Project;
@@ -17,7 +18,23 @@ class ProjectController extends Controller
 {
     public function __construct(protected ProjectService $projectService) {}
 
-    public function index(Request $request, Team $team): Response
+    private function redirectToTeamProjectsIndex(Team $team, Request $request, array $sessionFlash = []): RedirectResponse
+    {
+        $url = route('teams.projects.index', [$team], false);
+        $qs = $request->getQueryString();
+        if ($qs !== null && $qs !== '') {
+            $url .= '?'.$qs;
+        }
+
+        $redirect = redirect()->to($url);
+        foreach ($sessionFlash as $key => $value) {
+            $redirect->with($key, $value);
+        }
+
+        return $redirect;
+    }
+
+    public function index(IndexTeamProjectsRequest $request, Team $team): Response
     {
         $this->authorize('view', $team);
 
@@ -27,7 +44,11 @@ class ProjectController extends Controller
         $includeArchived = $request->boolean('include_archived')
             && $user->can('manageProjects', $team);
 
-        $projects = $this->projectService->listTeamProjects($team, $includeArchived);
+        /** @var array{ q?: string|null } $validated */
+        $validated = $request->validated();
+        $nameSearch = $validated['q'] ?? null;
+
+        $projects = $this->projectService->listTeamProjects($team, $includeArchived, $nameSearch);
 
         return Inertia::render('teams/projects/index', [
             'team' => $team->only(['id', 'name', 'owner_id']),
@@ -42,6 +63,9 @@ class ProjectController extends Controller
                 'manageProjects' => $user->can('manageProjects', $team),
                 'showArchived' => $includeArchived,
             ],
+            'filters' => [
+                'q' => $nameSearch ?? '',
+            ],
         ]);
     }
 
@@ -52,7 +76,7 @@ class ProjectController extends Controller
 
         $this->projectService->createProject($team, $validated['name']);
 
-        return redirect()->route('teams.projects.index', $team);
+        return $this->redirectToTeamProjectsIndex($team, $request, ['success' => __('Project created.')]);
     }
 
     public function update(UpdateProjectRequest $request, Team $team, Project $project): RedirectResponse
@@ -62,33 +86,40 @@ class ProjectController extends Controller
 
         $this->projectService->updateProject($project, $validated['name']);
 
-        return redirect()->route('teams.projects.index', $team);
+        return $this->redirectToTeamProjectsIndex($team, $request, ['success' => __('Project updated.')]);
     }
 
-    public function archive(Team $team, Project $project): RedirectResponse
+    public function archive(Request $request, Team $team, Project $project): RedirectResponse
     {
         $this->authorize('archive', $project);
 
         $this->projectService->archiveProject($project);
 
-        return redirect()->route('teams.projects.index', $team);
+        return $this->redirectToTeamProjectsIndex($team, $request, [
+            'success' => __('Project archived.'),
+            'undo' => [
+                'method' => 'post',
+                'url' => route('teams.projects.unarchive', [$team, $project], false),
+                'label' => __('Restore project'),
+            ],
+        ]);
     }
 
-    public function unarchive(Team $team, Project $project): RedirectResponse
+    public function unarchive(Request $request, Team $team, Project $project): RedirectResponse
     {
         $this->authorize('unarchive', $project);
 
         $this->projectService->unarchiveProject($project);
 
-        return redirect()->route('teams.projects.index', $team);
+        return $this->redirectToTeamProjectsIndex($team, $request, ['success' => __('Project restored.')]);
     }
 
-    public function destroy(Team $team, Project $project): RedirectResponse
+    public function destroy(Request $request, Team $team, Project $project): RedirectResponse
     {
         $this->authorize('delete', $project);
 
         $this->projectService->deleteProject($project);
 
-        return redirect()->route('teams.projects.index', $team);
+        return $this->redirectToTeamProjectsIndex($team, $request, ['success' => __('Project deleted.')]);
     }
 }

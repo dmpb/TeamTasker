@@ -20,9 +20,9 @@ class CommentService
     /**
      * @return Collection<int, Comment>
      */
-    public function listTaskComments(Task $task): Collection
+    public function listTaskComments(Task $task, ?string $bodySearch = null): Collection
     {
-        return $this->commentRepository->listCommentsForTask($task);
+        return $this->commentRepository->listCommentsForTask($task, $bodySearch);
     }
 
     public function createComment(Project $project, Task $task, User $user, string $body, ?User $actor = null): Comment

@@ -46,6 +46,9 @@ class UpdateTaskRequest extends FormRequest
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'assignee_id' => ['nullable', 'integer', 'exists:users,id'],
+            'search' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'filter_column' => ['sometimes', 'nullable', 'integer'],
+            'filter_assignee' => ['sometimes', 'nullable', 'integer'],
         ];
     }
 

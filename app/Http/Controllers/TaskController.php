@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\BuildsBoardRedirectUrl;
 use App\Http\Requests\MoveTaskRequest;
 use App\Http\Requests\StoreTaskRequest;
 use App\Http\Requests\UpdateTaskRequest;
@@ -16,6 +17,8 @@ use Illuminate\Http\Request;
 
 class TaskController extends Controller
 {
+    use BuildsBoardRedirectUrl;
+
     public function __construct(protected TaskService $taskService) {}
 
     public function store(StoreTaskRequest $request, Team $team, Project $project, Column $column): RedirectResponse
@@ -36,7 +39,8 @@ class TaskController extends Controller
             $request->user(),
         );
 
-        return redirect()->route('teams.projects.board', [$team, $project]);
+        return redirect()->to($this->boardUrlWithFilters($team, $project, $request))
+            ->with('success', __('Task created.'));
     }
 
     public function update(UpdateTaskRequest $request, Team $team, Project $project, Task $task): RedirectResponse
@@ -57,7 +61,8 @@ class TaskController extends Controller
             $request->user(),
         );
 
-        return redirect()->route('teams.projects.board', [$team, $project]);
+        return redirect()->to($this->boardUrlWithFilters($team, $project, $request))
+            ->with('success', __('Task updated.'));
     }
 
     public function move(MoveTaskRequest $request, Team $team, Project $project, Task $task): RedirectResponse
@@ -69,7 +74,8 @@ class TaskController extends Controller
 
         $this->taskService->moveTaskToColumn($project, $task, $targetColumn, $request->user());
 
-        return redirect()->route('teams.projects.board', [$team, $project]);
+        return redirect()->to($this->boardUrlWithFilters($team, $project, $request))
+            ->with('success', __('Task moved.'));
     }
 
     public function destroy(Request $request, Team $team, Project $project, Task $task): RedirectResponse
@@ -78,6 +84,7 @@ class TaskController extends Controller
 
         $this->taskService->deleteTask($project, $task, $request->user());
 
-        return redirect()->route('teams.projects.board', [$team, $project]);
+        return redirect()->to($this->boardUrlWithFilters($team, $project, $request))
+            ->with('success', __('Task deleted.'));
     }
 }

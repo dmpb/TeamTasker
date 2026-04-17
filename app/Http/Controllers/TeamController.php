@@ -74,7 +74,7 @@ class TeamController extends Controller
 
         $this->teamService->createTeam($user, $validated);
 
-        return back();
+        return back()->with('success', __('Team created.'));
     }
 
     public function storeMember(StoreTeamMemberRequest $request, Team $team): RedirectResponse
@@ -89,7 +89,7 @@ class TeamController extends Controller
             return back()->withErrors(['user_id' => $e->getMessage()]);
         }
 
-        return back();
+        return back()->with('success', __('Member added.'));
     }
 
     public function updateMember(UpdateTeamMemberRequest $request, Team $team, TeamMember $member): RedirectResponse
@@ -103,7 +103,7 @@ class TeamController extends Controller
             return back()->withErrors(['role' => $e->getMessage()]);
         }
 
-        return back();
+        return back()->with('success', __('Role updated.'));
     }
 
     public function destroyMember(Request $request, Team $team, TeamMember $member): RedirectResponse
@@ -116,6 +116,6 @@ class TeamController extends Controller
             return back()->withErrors(['user' => $e->getMessage()]);
         }
 
-        return back();
+        return back()->with('success', __('Member removed.'));
     }
 }

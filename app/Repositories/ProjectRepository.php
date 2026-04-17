@@ -11,7 +11,7 @@ class ProjectRepository
     /**
      * @return Collection<int, Project>
      */
-    public function listProjectsForTeam(Team $team, bool $includeArchived = false): Collection
+    public function listProjectsForTeam(Team $team, bool $includeArchived = false, ?string $nameSearch = null): Collection
     {
         $query = Project::query()
             ->where('team_id', $team->id)
@@ -19,6 +19,11 @@ class ProjectRepository
 
         if (! $includeArchived) {
             $query->notArchived();
+        }
+
+        if ($nameSearch !== null && $nameSearch !== '') {
+            $escaped = addcslashes($nameSearch, '%_\\');
+            $query->where('name', 'like', '%'.$escaped.'%');
         }
 
         return $query->get();

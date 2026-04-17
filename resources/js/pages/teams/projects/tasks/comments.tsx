@@ -1,4 +1,5 @@
-import { Form, Head, Link, usePage } from '@inertiajs/react';
+import { Form, Head, Link, router, usePage } from '@inertiajs/react';
+import { useEffect, useState } from 'react';
 import { MessageSquare, PencilLine, Trash2 } from 'lucide-react';
 import CommentController from '@/actions/App/Http/Controllers/CommentController';
 import InputError from '@/components/input-error';
@@ -12,6 +13,8 @@ import {
     board as projectBoard,
     index as teamProjectsIndex,
 } from '@/routes/teams/projects';
+import { index as taskCommentsIndex } from '@/routes/teams/projects/tasks/comments/index';
+import { Input } from '@/components/ui/input';
 import type { Auth, BreadcrumbItem } from '@/types';
 
 const textareaClass = cn(
@@ -52,6 +55,9 @@ type TaskCommentsPageProps = {
         createComments: boolean;
     };
     comments: CommentRow[];
+    filters: {
+        q: string;
+    };
 };
 
 function formatDateTime(iso: string | null): string {
@@ -69,7 +75,37 @@ function formatDateTime(iso: string | null): string {
 
 export default function TaskComments() {
     const page = usePage<TaskCommentsPageProps>();
-    const { auth, team, project, task, can, comments } = page.props;
+    const { auth, team, project, task, can, comments, filters } = page.props;
+
+    const [draftQ, setDraftQ] = useState(filters.q);
+
+    useEffect(() => {
+        setDraftQ(filters.q);
+    }, [filters.q]);
+
+    const applyCommentSearch = (): void => {
+        const query: Record<string, string> = {};
+        if (draftQ.trim() !== '') {
+            query.q = draftQ.trim();
+        }
+        router.get(
+            taskCommentsIndex.url(
+                { team: team.id, project: project.id, task: task.id },
+                { query: Object.keys(query).length ? query : undefined },
+            ),
+            {},
+            { preserveScroll: true, replace: true },
+        );
+    };
+
+    const clearCommentSearch = (): void => {
+        setDraftQ('');
+        router.get(
+            taskCommentsIndex.url({ team: team.id, project: project.id, task: task.id }),
+            {},
+            { preserveScroll: true, replace: true },
+        );
+    };
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Teams', href: teamsIndex() },
@@ -113,6 +149,27 @@ export default function TaskComments() {
                         </Link>
                     </div>
                 </div>
+
+                <section className="flex flex-col gap-3 rounded-md border border-sidebar-border/70 p-4 sm:flex-row sm:items-end dark:border-sidebar-border">
+                    <div className="grid max-w-md flex-1 gap-2">
+                        <Label htmlFor="comment-search">Search comments</Label>
+                        <Input
+                            id="comment-search"
+                            value={draftQ}
+                            onChange={(e) => setDraftQ(e.target.value)}
+                            placeholder="Filter by text in the comment…"
+                            maxLength={255}
+                        />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        <Button type="button" size="sm" onClick={applyCommentSearch}>
+                            Search
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" onClick={clearCommentSearch}>
+                            Clear
+                        </Button>
+                    </div>
+                </section>
 
                 {can.createComments && (
                     <section className="space-y-4 rounded-md border border-sidebar-border/70 p-4 dark:border-sidebar-border">

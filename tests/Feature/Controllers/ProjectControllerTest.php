@@ -51,7 +51,25 @@ it('shows projects for a team member with inertia', function () {
             ->where('team.name', 'Acme')
             ->where('can.manageProjects', true)
             ->has('projects', 1)
-            ->where('projects.0.name', 'Board'));
+            ->where('projects.0.name', 'Board')
+            ->has('filters')
+            ->where('filters.q', ''));
+});
+
+it('filters team projects by name using the q query parameter', function () {
+    $owner = User::factory()->create();
+    $team = app(TeamService::class)->createTeam($owner, ['name' => 'Acme']);
+    Project::factory()->forTeam($team)->create(['name' => 'Alpha Board']);
+    Project::factory()->forTeam($team)->create(['name' => 'Beta']);
+
+    /** @var TestCase $this */
+    $this->actingAs($owner)
+        ->get(route('teams.projects.index', [$team, 'q' => 'Alpha']))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('projects', 1)
+            ->where('projects.0.name', 'Alpha Board')
+            ->where('filters.q', 'Alpha'));
 });
 
 it('allows plain members to list projects but not create them', function () {

@@ -35,6 +35,9 @@ class UpdateColumnRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
+            'search' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'filter_column' => ['sometimes', 'nullable', 'integer'],
+            'filter_assignee' => ['sometimes', 'nullable', 'integer'],
         ];
     }
 }

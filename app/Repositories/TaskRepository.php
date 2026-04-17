@@ -25,15 +25,34 @@ class TaskRepository
      *
      * @return Collection<int, Column>
      */
-    public function listColumnsWithTasksOrderedForProject(Project $project): Collection
-    {
-        return Column::query()
+    public function listColumnsWithTasksOrderedForProject(
+        Project $project,
+        ?int $columnIdFilter = null,
+        ?int $assigneeIdFilter = null,
+        ?string $titleSearch = null,
+    ): Collection {
+        $columnsQuery = Column::query()
             ->where('project_id', $project->id)
             ->orderBy('position')
-            ->orderBy('id')
+            ->orderBy('id');
+
+        if ($columnIdFilter !== null) {
+            $columnsQuery->where('id', $columnIdFilter);
+        }
+
+        return $columnsQuery
             ->with([
-                'tasks' => static function ($query): void {
+                'tasks' => static function ($query) use ($assigneeIdFilter, $titleSearch): void {
                     $query->with('assignee')->orderBy('position')->orderBy('id');
+
+                    if ($assigneeIdFilter !== null) {
+                        $query->where('assignee_id', $assigneeIdFilter);
+                    }
+
+                    if ($titleSearch !== null && $titleSearch !== '') {
+                        $escaped = addcslashes($titleSearch, '%_\\');
+                        $query->where('title', 'like', '%'.$escaped.'%');
+                    }
                 },
             ])
             ->get();

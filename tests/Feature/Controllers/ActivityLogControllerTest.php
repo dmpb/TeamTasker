@@ -58,7 +58,34 @@ it('shows project activity logs for team members', function () {
             ->where('project.id', $project->id)
             ->has('activityLogs', 1)
             ->where('activityLogs.0.event', 'task.created')
-            ->where('activityLogs.0.actor.id', $owner->id));
+            ->where('activityLogs.0.actor.id', $owner->id)
+            ->has('actors')
+            ->has('filters')
+            ->where('filters.event', '')
+            ->where('filters.actor_id', null)
+            ->where('filters.q', ''));
+});
+
+it('applies activity event filter from query string', function () {
+    $owner = User::factory()->create();
+    $member = User::factory()->create();
+    $team = Team::factory()->forOwner($owner)->create();
+    TeamMember::factory()->forTeam($team)->forUser($member)->create();
+    $project = Project::factory()->forTeam($team)->create();
+    $column = Column::factory()->forProject($project)->create();
+    $task = Task::factory()->forColumn($column)->create();
+    $activityService = app(ActivityLogService::class);
+    $activityService->recordTaskCreated($task, $owner);
+    $activityService->recordTaskDeleted($task, $owner);
+
+    /** @var TestCase $this */
+    $this->actingAs($member)
+        ->get(route('teams.projects.activity.index', [$team, $project, 'event' => 'task.created']))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('activityLogs', 1)
+            ->where('activityLogs.0.event', 'task.created')
+            ->where('filters.event', 'task.created'));
 });
 
 it('returns 404 when the project belongs to another team', function () {
