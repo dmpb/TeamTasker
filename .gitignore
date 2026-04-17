@@ -26,3 +26,12 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# Agent tooling not used in this repo
+/.claude/
+/.agents/
+/.junie/
+
+# Duplicated skill/rules artifacts
+**/SKILL [0-9]*.md
+**/rules [0-9]*/
