@@ -36,6 +36,19 @@ class TeamService
         return $this->teamRepository->getTeamsByUser($user);
     }
 
+    public function getMembership(Team $team, User $user): ?TeamMember
+    {
+        return $this->teamRepository->findMembership($team, $user);
+    }
+
+    /**
+     * @return list<array{id: int, name: string, email: string}>
+     */
+    public function searchUsersNotInTeam(Team $team, string $query, int $limit = 12): array
+    {
+        return $this->teamRepository->searchUsersNotInTeam($team, $query, $limit);
+    }
+
     /**
      * Adds or updates a member with role admin or member (not owner; owner is set only at team creation).
      */

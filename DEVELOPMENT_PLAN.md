@@ -505,6 +505,8 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 
 ### Phase 8 — Onboarding y colaboración (invitaciones + miembros)
 
+**Estado:** Completada (8.A–8.D).
+
 **Nota de alcance:** invitaciones con **enlace manual primero** (8.A–8.C), luego **correo automático** (8.D), misma entidad `team_invitations`.
 
 #### Phase 8.A – Backend Foundation (Invitaciones por email)
@@ -807,7 +809,7 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 
 ### Seguimiento incremental (nuevo alcance)
 
-**Recommended next subphase:** `Phase 8.A` (Invitaciones — backend foundation), tras cierre de Phase 7.
+**Recommended next subphase:** `Phase 9.A` (fechas límite y prioridad en tareas), tras cierre de Phase 8.
 
 **Alternative paths:**
 
@@ -822,10 +824,10 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 - `Phase 7.A`: ✅ done  
 - `Phase 7.B`: ✅ done  
 - `Phase 7.C`: ✅ done  
-- `Phase 8.A`: ⏳ pending  
-- `Phase 8.B`: ⏳ pending  
-- `Phase 8.C`: ⏳ pending  
-- `Phase 8.D`: ⏳ pending  
+- `Phase 8.A`: ✅ done  
+- `Phase 8.B`: ✅ done  
+- `Phase 8.C`: ✅ done  
+- `Phase 8.D`: ✅ done  
 - `Phase 9.A`: ⏳ pending  
 - `Phase 9.B`: ⏳ pending  
 - `Phase 9.C`: ⏳ pending  
@@ -844,7 +846,7 @@ Si la query “equipos del usuario” se repite en más sitios, unificar en **un
 
 ## 5. Referencia rápida: entidades (`PROJECT_RULES.md`)
 
-User, Team, TeamMember, Project, Column, Task, Comment, ActivityLog.
+User, Team, TeamMember, TeamInvitation, Project, Column, Task, Comment, ActivityLog.
 
 **Orden de ejecución:** Phase 0 → 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 (**8.A → 8.B → 8.C → 8.D**) → 9 → 10, respetando **.A antes que .B, .B antes que .C** dentro de cada fase (y subfases adicionales como 8.D, 9.D.2, 9.C.3 en el orden indicado en cada fase).
 

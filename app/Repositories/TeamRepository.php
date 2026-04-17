@@ -64,4 +64,37 @@ class TeamRepository
             ->orderByDesc('id')
             ->get();
     }
+
+    /**
+     * @return list<array{id: int, name: string, email: string}>
+     */
+    public function searchUsersNotInTeam(Team $team, string $query, int $limit = 12): array
+    {
+        $trimmed = trim($query);
+
+        if (strlen($trimmed) < 2) {
+            return [];
+        }
+
+        $escaped = addcslashes($trimmed, '%_\\');
+
+        return User::query()
+            ->where(function ($inner) use ($escaped): void {
+                $inner->where('email', 'ilike', '%'.$escaped.'%')
+                    ->orWhere('name', 'ilike', '%'.$escaped.'%');
+            })
+            ->whereDoesntHave('teamMemberships', function ($members) use ($team): void {
+                $members->where('team_id', $team->id);
+            })
+            ->orderBy('name')
+            ->limit($limit)
+            ->get(['id', 'name', 'email'])
+            ->map(static fn (User $user): array => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+            ])
+            ->values()
+            ->all();
+    }
 }

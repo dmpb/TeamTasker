@@ -2,6 +2,7 @@
 
 use App\Enums\TeamMemberRole;
 use App\Models\Team;
+use App\Models\TeamInvitation;
 use App\Models\TeamMember;
 use App\Models\User;
 use App\Services\TeamService;
@@ -103,6 +104,17 @@ it('redirects guests from teams routes to login', function () {
         'role' => 'admin',
     ])->assertRedirect(route('login'));
     $this->delete(route('teams.members.destroy', [$team, $member]))->assertRedirect(route('login'));
+
+    $invitation = TeamInvitation::factory()->forTeam($team)->invitedBy($user)->create();
+
+    $this->post(route('teams.invitations.store', $team), [
+        'email' => 'inv@example.com',
+        'role' => 'member',
+    ])->assertRedirect(route('login'));
+
+    $this->delete(route('teams.invitations.destroy', [$team, $invitation]))->assertRedirect(route('login'));
+
+    $this->post(route('teams.invitations.resend', [$team, $invitation]))->assertRedirect(route('login'));
 });
 
 it('forbids viewing a team the user does not belong to', function () {
@@ -131,14 +143,37 @@ it('shows a team to members and owners with inertia', function () {
         ->assertInertia(fn ($page) => $page
             ->component('teams/show')
             ->where('team.name', 'Visible Team')
-            ->where('can.manageMembers', true));
+            ->where('can.manageMembers', true)
+            ->has('invitations')
+            ->has('memberSuggestions'));
 
     $this->actingAs($member)
         ->get(route('teams.show', $team))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('teams/show')
-            ->where('can.manageMembers', false));
+            ->where('can.manageMembers', false)
+            ->has('invitations', 0)
+            ->has('memberSuggestions', 0));
+});
+
+it('returns member suggestions for managers when user_q is set', function () {
+    $owner = User::factory()->create();
+    $outsider = User::factory()->create([
+        'name' => 'UniqueSearchNameXyz',
+        'email' => 'unique-search-xyz@example.com',
+    ]);
+    $team = Team::factory()->forOwner($owner)->create();
+
+    $url = route('teams.show', $team).'?'.http_build_query(['user_q' => 'UniqueSearch']);
+
+    /** @var TestCase $this */
+    $this->actingAs($owner)
+        ->get($url)
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('memberSuggestions', 1)
+            ->where('memberSuggestions.0.email', $outsider->email));
 });
 
 it('forbids plain members from managing team membership via http', function () {

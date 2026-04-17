@@ -18,7 +18,12 @@ Aplicacion web para gestion colaborativa de equipos, proyectos y tareas tipo tab
 - CRUD de tareas y movimiento entre columnas
 - Comentarios por tarea
 - Registro de actividad por proyecto
+- Invitaciones a equipo por email (enlace manual + correo si `MAIL_*` esta configurado)
 - Area de configuracion de perfil, seguridad y apariencia
+
+### Invitaciones por correo (Phase 8)
+
+Las invitaciones encolan `TeamInvitationMail` (cola por defecto). Para envio real en local, configura en `.env` al menos `MAIL_MAILER`, `MAIL_HOST`, etc. (por ejemplo `log` o `Mailpit` con Sail). Sin correo configurado, el flujo sigue siendo usable copiando el enlace desde la pagina del equipo.
 
 ## Requisitos
 

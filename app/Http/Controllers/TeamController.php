@@ -6,8 +6,10 @@ use App\Http\Requests\StoreTeamMemberRequest;
 use App\Http\Requests\StoreTeamRequest;
 use App\Http\Requests\UpdateTeamMemberRequest;
 use App\Models\Team;
+use App\Models\TeamInvitation;
 use App\Models\TeamMember;
 use App\Models\User;
+use App\Services\TeamInvitationService;
 use App\Services\TeamService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,7 +19,10 @@ use InvalidArgumentException;
 
 class TeamController extends Controller
 {
-    public function __construct(protected TeamService $teamService) {}
+    public function __construct(
+        protected TeamService $teamService,
+        protected TeamInvitationService $teamInvitationService,
+    ) {}
 
     public function index(Request $request): Response
     {
@@ -41,6 +46,34 @@ class TeamController extends Controller
         $user = $request->user();
         $canManageMembers = $user->can('manageMembers', $team);
 
+        $memberSuggestions = [];
+
+        if ($canManageMembers) {
+            $memberSearchQuery = trim((string) $request->query('user_q', ''));
+
+            if (strlen($memberSearchQuery) >= 2) {
+                $memberSuggestions = $this->teamService->searchUsersNotInTeam($team, $memberSearchQuery, 12);
+            }
+        }
+
+        $invitations = [];
+
+        if ($canManageMembers) {
+            $invitations = $this->teamInvitationService
+                ->listOpenInvitationsForTeam($team)
+                ->map(static function (TeamInvitation $invitation): array {
+                    return [
+                        'id' => $invitation->id,
+                        'email' => $invitation->email,
+                        'role' => $invitation->role,
+                        'expires_at' => $invitation->expires_at->toIso8601String(),
+                        'is_expired' => $invitation->isExpired(),
+                        'invited_by_name' => $invitation->inviter->name,
+                        'accept_url' => route('team-invitations.show', ['token' => $invitation->token], absolute: true),
+                    ];
+                })->values()->all();
+        }
+
         return Inertia::render('teams/show', [
             'team' => $team->only(['id', 'name', 'owner_id']),
             'members' => $team->members->map(function ($member) use ($canManageMembers, $team): array {
@@ -61,6 +94,8 @@ class TeamController extends Controller
             'can' => [
                 'manageMembers' => $canManageMembers,
             ],
+            'invitations' => $invitations,
+            'memberSuggestions' => $memberSuggestions,
         ]);
     }
 

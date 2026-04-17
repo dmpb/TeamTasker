@@ -7,6 +7,8 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TeamController;
+use App\Http\Controllers\TeamInvitationAcceptController;
+use App\Http\Controllers\TeamInvitationController;
 use App\Models\TeamMember;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\Route;
@@ -16,13 +18,19 @@ Route::inertia('/', 'welcome', [
     'canRegister' => Features::enabled(Features::registration()),
 ])->name('home');
 
+Route::get('invitations/{token}', [TeamInvitationAcceptController::class, 'show'])
+    ->name('team-invitations.show');
+
 Route::middleware(['auth', 'verified'])->group(function () {
+    Route::post('invitations/{token}/accept', [TeamInvitationAcceptController::class, 'accept'])
+        ->name('team-invitations.accept');
     Route::get('dashboard', DashboardController::class)->name('dashboard');
 
     Route::get('teams', [TeamController::class, 'index'])->name('teams.index');
     Route::post('teams', [TeamController::class, 'store'])->name('teams.store');
     Route::get('teams/{team}', [TeamController::class, 'show'])->name('teams.show');
     Route::post('teams/{team}/members', [TeamController::class, 'storeMember'])->name('teams.members.store');
+    Route::post('teams/{team}/invitations', [TeamInvitationController::class, 'store'])->name('teams.invitations.store');
 
     Route::scopeBindings()->group(function () {
         Route::bind('member', static function (string $value, RoutingRoute $route): TeamMember {
@@ -39,6 +47,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::patch('teams/{team}/members/{member}', [TeamController::class, 'updateMember'])->name('teams.members.update');
         Route::delete('teams/{team}/members/{member}', [TeamController::class, 'destroyMember'])->name('teams.members.destroy');
+
+        Route::delete('teams/{team}/invitations/{invitation}', [TeamInvitationController::class, 'destroy'])->name('teams.invitations.destroy');
+        Route::post('teams/{team}/invitations/{invitation}/resend', [TeamInvitationController::class, 'resend'])->name('teams.invitations.resend');
 
         Route::get('teams/{team}/projects', [ProjectController::class, 'index'])->name('teams.projects.index');
         Route::post('teams/{team}/projects', [ProjectController::class, 'store'])->name('teams.projects.store');

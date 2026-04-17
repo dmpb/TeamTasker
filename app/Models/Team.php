@@ -50,4 +50,12 @@ class Team extends Model
     {
         return $this->hasMany(Project::class);
     }
+
+    /**
+     * @return HasMany<TeamInvitation, $this>
+     */
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(TeamInvitation::class);
+    }
 }
