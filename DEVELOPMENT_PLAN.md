@@ -733,12 +733,12 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 
 **Chunks:**
 
-- **Chunk 10.A.1 (Frontend):** habilitar DnD en board para columnas y tareas, reutilizando endpoints `reorder` y `move` ya existentes.  
-  - **Áreas:** `resources/js/pages/teams/projects/board.tsx`, componentes auxiliares DnD.  
-  - **Verificación:** movimiento visual consistente y fallback accesible por teclado/botones.
-- **Chunk 10.A.2 (Aplicación):** ajustar contratos de payload y validaciones para garantizar orden/posición estable en operaciones rápidas.  
-  - **Áreas:** requests/controladores/servicios de `Column` y `Task`.  
-  - **Verificación:** tests de reorden/movimiento concurrente básico y no regresión.
+- **Chunk 10.A.1 (Frontend):** DnD con `@dnd-kit` para **tareas** en el board (`POST .../board/tasks/sync`); **columnas** siguen usando el reorder HTTP existente (chevrones) como fallback estable.  
+  - **Áreas:** `resources/js/pages/teams/projects/board.tsx`, `resources/js/components/project-board/BoardTasksDnd.tsx`.  
+  - **Verificación:** movimiento visual consistente; con filtros de tablero activos el DnD de tareas se desactiva (payload debe incluir todas las tareas del proyecto).
+- **Chunk 10.A.2 (Aplicación):** sync atómico de layout (`TaskRepository::syncBoardTaskLayout`) con fase intermedia de posiciones temporales para respetar `UNIQUE(column_id, position)`; validación `present`+`array` en `task_ids` (incluye columnas vacías).  
+  - **Áreas:** `SyncBoardTaskLayoutRequest`, `TaskController::syncBoard`, `TaskRepository`.  
+  - **Verificación:** Pest `TaskBoardSyncTest`.
 
 **Definition of done:**
 
@@ -759,12 +759,12 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 
 **Chunks:**
 
-- **Chunk 10.B.1 (Backend):** eventos de dominio + persistencia de notificaciones por usuario con estado leído/no leído.  
-  - **Áreas:** servicios de tareas/comentarios/miembros, modelos/repositorios de notificación.  
-  - **Verificación:** tests de generación y visibilidad de notificaciones por actor/receptor.
-- **Chunk 10.B.2 (Frontend):** centro de notificaciones en layout/sidebar con contador y acciones “mark as read”.  
-  - **Áreas:** layout principal, componentes de notificación, páginas afectadas por deep links.  
-  - **Verificación:** navegación al contexto correcto desde cada notificación.
+- **Chunk 10.B.1 (Backend):** tabla `notifications` (canal `database`), `NotificationService` disparado desde `TaskService` (asignación) y `CommentService` (comentario en tarea asignada a otro).  
+  - **Áreas:** `app/Notifications/*`, `NotificationService`, `TaskService`, `CommentService`.  
+  - **Verificación:** Pest `NotificationControllerTest` (listado); cobertura de negocio ampliable con tests de notificación explícitos.
+- **Chunk 10.B.2 (Frontend):** página `notifications/index`, rutas `notifications.*`, contador compartido `notificationUnreadCount` en `HandleInertiaRequests`, enlace + badge en `app-sidebar.tsx`.  
+  - **Áreas:** `resources/js/pages/notifications/index.tsx`, sidebar, middleware Inertia.  
+  - **Verificación:** marcar leída / marcar todas; enlace “Abrir” usa `url` de la notificación.
 
 **Definition of done:**
 
@@ -787,12 +787,12 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 
 **Chunks:**
 
-- **Chunk 10.C.1 (Backend):** ampliar `ActivityLogRepository` con filtros compuestos y endpoint de export (CSV) bajo autorización de proyecto.  
-  - **Áreas:** repositorio/servicio/controlador de actividad, policies, tests de export.  
-  - **Verificación:** Pest de filtros y de contenido exportado con scope correcto; miembro sin rol admin/owner recibe 403 en export.
-- **Chunk 10.C.2 (Frontend):** filtros UI en `activity/index.tsx` + acción de export conservando parámetros activos.  
-  - **Áreas:** `resources/js/pages/teams/projects/activity/index.tsx`.  
-  - **Verificación:** resultado de export coincide con la tabla filtrada en UI.
+- **Chunk 10.C.1 (Backend):** `ActivityLogRepository::chunkForProject` + `ActivityLogController::exportCsv` (StreamedResponse CSV), policy `ProjectPolicy::exportActivityLog` (`manageProjects` del equipo).  
+  - **Áreas:** `ActivityLogRepository`, `ActivityLogService`, `ActivityLogController`, `ProjectPolicy`.  
+  - **Verificación:** Pest `ActivityLogExportTest` (403 miembro, 200 owner).
+- **Chunk 10.C.2 (Frontend):** botón “Export CSV” en `activity/index.tsx` con mismos query params que los filtros aplicados en página; filtros de evento ampliados (`task.completed`, `task.reopened`).  
+  - **Áreas:** `resources/js/pages/teams/projects/activity/index.tsx`, Wayfinder `exportMethod`.  
+  - **Verificación:** export solo visible si `can.exportActivityLog`.
 
 **Definition of done:**
 
@@ -809,7 +809,7 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 
 ### Seguimiento incremental (nuevo alcance)
 
-**Recommended next subphase:** `Phase 9.A` (fechas límite y prioridad en tareas), tras cierre de Phase 8.
+**Recommended next subphase:** `Phase 10.A`, tras cierre de Phase 9.
 
 **Alternative paths:**
 
@@ -828,13 +828,13 @@ Documento basado en el estado del repositorio y `PROJECT_RULES.md`. Cada **chunk
 - `Phase 8.B`: ✅ done  
 - `Phase 8.C`: ✅ done  
 - `Phase 8.D`: ✅ done  
-- `Phase 9.A`: ⏳ pending  
-- `Phase 9.B`: ⏳ pending  
-- `Phase 9.C`: ⏳ pending  
-- `Phase 9.D`: ⏳ pending  
-- `Phase 10.A`: ⏳ pending  
-- `Phase 10.B`: ⏳ pending  
-- `Phase 10.C`: ⏳ pending
+- `Phase 9.A`: ✅ done  
+- `Phase 9.B`: ✅ done  
+- `Phase 9.C`: ✅ done  
+- `Phase 9.D`: ✅ done  
+- `Phase 10.A`: ✅ done (DnD tareas + sync atómico; columnas vía reorder existente)  
+- `Phase 10.B`: ✅ done (notificaciones DB + UI + contador sidebar)  
+- `Phase 10.C`: ✅ done (export CSV + permisos + botón en actividad)
 
 ---
 

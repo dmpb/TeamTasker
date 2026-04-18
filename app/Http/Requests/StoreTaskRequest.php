@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\TaskPriority;
 use App\Models\Column;
 use App\Models\Project;
 use App\Models\Task;
@@ -9,6 +10,7 @@ use App\Models\Team;
 use App\Models\TeamMember;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class StoreTaskRequest extends FormRequest
@@ -17,6 +19,14 @@ class StoreTaskRequest extends FormRequest
     {
         if ($this->has('assignee_id') && $this->input('assignee_id') === '') {
             $this->merge(['assignee_id' => null]);
+        }
+
+        if ($this->has('due_date') && $this->input('due_date') === '') {
+            $this->merge(['due_date' => null]);
+        }
+
+        if ($this->has('priority') && $this->input('priority') === '') {
+            $this->merge(['priority' => null]);
         }
     }
 
@@ -43,13 +53,23 @@ class StoreTaskRequest extends FormRequest
      */
     public function rules(): array
     {
+        /** @var Project $project */
+        $project = $this->route('project');
+
         return [
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'assignee_id' => ['nullable', 'integer', 'exists:users,id'],
+            'due_date' => ['sometimes', 'nullable', 'date'],
+            'priority' => ['sometimes', 'nullable', 'string', Rule::enum(TaskPriority::class)],
+            'label_ids' => ['sometimes', 'array'],
+            'label_ids.*' => ['integer', Rule::exists('labels', 'id')->where('project_id', $project->id)],
             'search' => ['sometimes', 'nullable', 'string', 'max:255'],
             'filter_column' => ['sometimes', 'nullable', 'integer'],
             'filter_assignee' => ['sometimes', 'nullable', 'integer'],
+            'filter_label' => ['sometimes', 'nullable', 'integer'],
+            'filter_priority' => ['sometimes', 'nullable', 'string', 'max:20'],
+            'filter_due' => ['sometimes', 'nullable', 'string', 'max:32'],
         ];
     }
 

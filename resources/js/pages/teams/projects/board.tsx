@@ -5,9 +5,11 @@ import {
     router,
     usePage,
 } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, LayoutGrid, Trash2 } from 'lucide-react';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, GripVertical, LayoutGrid, Trash2 } from 'lucide-react';
 import ColumnController from '@/actions/App/Http/Controllers/ColumnController';
+import LabelController from '@/actions/App/Http/Controllers/LabelController';
 import TaskController from '@/actions/App/Http/Controllers/TaskController';
 import { ConfirmDestructiveDialog } from '@/components/confirm-destructive-dialog';
 import Heading from '@/components/heading';
@@ -21,9 +23,16 @@ import AppLayout from '@/layouts/app-layout';
 import { index as teamsIndex, show as teamsShow } from '@/routes/teams';
 import { index as projectActivityIndex } from '@/routes/teams/projects/activity/index';
 import { board as projectBoard, index as teamProjectsIndex } from '@/routes/teams/projects';
+import { show as taskShow } from '@/routes/teams/projects/tasks';
 import { index as taskCommentsIndex } from '@/routes/teams/projects/tasks/comments/index';
 import type { BreadcrumbItem } from '@/types';
 import { BoardFilterHiddenFields } from '@/pages/teams/projects/board-filter-hidden-fields';
+import {
+    BoardColumnDropZone,
+    BoardSortableTaskShell,
+    BoardTasksDnd,
+    boardTasksForColumn,
+} from '@/components/project-board/BoardTasksDnd';
 
 const textareaClass = cn(
     'border-input placeholder:text-muted-foreground flex min-h-[4rem] w-full rounded-md border bg-transparent px-3 py-2 text-sm shadow-xs transition-[color,box-shadow] outline-none',
@@ -31,11 +40,24 @@ const textareaClass = cn(
     'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
 );
 
+type LabelRow = {
+    id: number;
+    name: string;
+    color: string | null;
+};
+
 type TaskRow = {
     id: number;
     title: string;
     description: string | null;
     position: number;
+    due_date: string | null;
+    priority: string;
+    completed_at: string | null;
+    is_completed: boolean;
+    checklist_done: number;
+    checklist_total: number;
+    labels: LabelRow[];
     assignee: { id: number; name: string } | null;
 };
 
@@ -62,6 +84,7 @@ type ProjectBoardPageProps = {
         name: string;
         archived_at: string | null;
     };
+    labels: LabelRow[];
     columns: ColumnRow[];
     assignableUsers: AssignableUser[];
     can: {
@@ -72,8 +95,58 @@ type ProjectBoardPageProps = {
         filter_column: number | null;
         filter_assignee: number | null;
         search: string;
+        filter_label: number | null;
+        filter_priority: string;
+        filter_due: string;
     };
 };
+
+function hasActiveBoardFilters(filters: ProjectBoardPageProps['filters']): boolean {
+    return (
+        filters.search.trim() !== '' ||
+        filters.filter_column != null ||
+        filters.filter_assignee != null ||
+        filters.filter_label != null ||
+        filters.filter_priority !== '' ||
+        filters.filter_due !== ''
+    );
+}
+
+function priorityLabel(p: string): string {
+    if (p === 'high') {
+        return 'High';
+    }
+    if (p === 'low') {
+        return 'Low';
+    }
+
+    return 'Medium';
+}
+
+function dueHint(dueDate: string | null, isCompleted: boolean): { text: string; className: string } | null {
+    if (!dueDate || isCompleted) {
+        return null;
+    }
+
+    const [y, m, d] = dueDate.split('-').map((n) => Number.parseInt(n, 10));
+    const due = new Date(y, m - 1, d);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    due.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((due.getTime() - today.getTime()) / 86400000);
+
+    if (diffDays < 0) {
+        return { text: 'Overdue', className: 'text-destructive' };
+    }
+    if (diffDays === 0) {
+        return { text: 'Due today', className: 'text-amber-600 dark:text-amber-400' };
+    }
+    if (diffDays <= 7) {
+        return { text: 'Due soon', className: 'text-muted-foreground' };
+    }
+
+    return { text: `Due ${dueDate}`, className: 'text-muted-foreground' };
+}
 
 function swapColumnOrder(ids: number[], index: number, direction: -1 | 1): number[] {
     const next = [...ids];
@@ -88,7 +161,21 @@ function swapColumnOrder(ids: number[], index: number, direction: -1 | 1): numbe
 
 export default function ProjectBoard() {
     const page = usePage<ProjectBoardPageProps>();
-    const { team, project, columns, assignableUsers, can, filters } = page.props;
+    const { team, project, labels, columns, assignableUsers, can, filters } = page.props;
+
+    const boardTaskDnDActive =
+        can.manageTasks && project.archived_at === null && !hasActiveBoardFilters(filters);
+
+    const taskById = useMemo(() => {
+        const m = new Map<number, TaskRow>();
+        for (const c of columns) {
+            for (const t of c.tasks) {
+                m.set(t.id, t);
+            }
+        }
+
+        return m;
+    }, [columns]);
 
     const [taskPendingDelete, setTaskPendingDelete] = useState<TaskRow | null>(null);
     const [columnPendingDelete, setColumnPendingDelete] = useState<ColumnRow | null>(null);
@@ -100,12 +187,27 @@ export default function ProjectBoard() {
     const [draftAssignee, setDraftAssignee] = useState<string>(
         filters.filter_assignee != null ? String(filters.filter_assignee) : '',
     );
+    const [draftLabel, setDraftLabel] = useState<string>(
+        filters.filter_label != null ? String(filters.filter_label) : '',
+    );
+    const [draftPriority, setDraftPriority] = useState<string>(filters.filter_priority ?? '');
+    const [draftDue, setDraftDue] = useState<string>(filters.filter_due ?? '');
 
     useEffect(() => {
         setDraftSearch(filters.search);
         setDraftColumn(filters.filter_column != null ? String(filters.filter_column) : '');
         setDraftAssignee(filters.filter_assignee != null ? String(filters.filter_assignee) : '');
-    }, [filters.search, filters.filter_column, filters.filter_assignee]);
+        setDraftLabel(filters.filter_label != null ? String(filters.filter_label) : '');
+        setDraftPriority(filters.filter_priority ?? '');
+        setDraftDue(filters.filter_due ?? '');
+    }, [
+        filters.search,
+        filters.filter_column,
+        filters.filter_assignee,
+        filters.filter_label,
+        filters.filter_priority,
+        filters.filter_due,
+    ]);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Teams', href: teamsIndex() },
@@ -135,6 +237,15 @@ export default function ProjectBoard() {
         if (filters.filter_assignee != null) {
             payload.filter_assignee = filters.filter_assignee;
         }
+        if (filters.filter_label != null) {
+            payload.filter_label = filters.filter_label;
+        }
+        if (filters.filter_priority !== '') {
+            payload.filter_priority = filters.filter_priority;
+        }
+        if (filters.filter_due !== '') {
+            payload.filter_due = filters.filter_due;
+        }
 
         router.post(
             ColumnController.reorder.url({
@@ -155,6 +266,9 @@ export default function ProjectBoard() {
                         ...(draftSearch.trim() !== '' ? { search: draftSearch.trim() } : {}),
                         ...(draftColumn !== '' ? { filter_column: draftColumn } : {}),
                         ...(draftAssignee !== '' ? { filter_assignee: draftAssignee } : {}),
+                        ...(draftLabel !== '' ? { filter_label: draftLabel } : {}),
+                        ...(draftPriority !== '' ? { filter_priority: draftPriority } : {}),
+                        ...(draftDue !== '' ? { filter_due: draftDue } : {}),
                     },
                 },
             ),
@@ -167,6 +281,9 @@ export default function ProjectBoard() {
         setDraftSearch('');
         setDraftColumn('');
         setDraftAssignee('');
+        setDraftLabel('');
+        setDraftPriority('');
+        setDraftDue('');
         router.get(
             projectBoard.url({ team: team.id, project: project.id }),
             {},
@@ -252,6 +369,51 @@ export default function ProjectBoard() {
                             </select>
                         </div>
                     )}
+                    <div className="grid min-w-[10rem] flex-1 gap-2">
+                        <Label htmlFor="board-label">Label</Label>
+                        <select
+                            id="board-label"
+                            value={draftLabel}
+                            onChange={(e) => setDraftLabel(e.target.value)}
+                            className="border-input bg-background h-9 w-full max-w-md rounded-md border px-2 text-sm"
+                        >
+                            <option value="">Any label</option>
+                            {labels.map((l) => (
+                                <option key={l.id} value={String(l.id)}>
+                                    {l.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="grid min-w-[10rem] flex-1 gap-2">
+                        <Label htmlFor="board-priority">Priority</Label>
+                        <select
+                            id="board-priority"
+                            value={draftPriority}
+                            onChange={(e) => setDraftPriority(e.target.value)}
+                            className="border-input bg-background h-9 w-full max-w-md rounded-md border px-2 text-sm"
+                        >
+                            <option value="">Any priority</option>
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                    <div className="grid min-w-[10rem] flex-1 gap-2">
+                        <Label htmlFor="board-due">Due</Label>
+                        <select
+                            id="board-due"
+                            value={draftDue}
+                            onChange={(e) => setDraftDue(e.target.value)}
+                            className="border-input bg-background h-9 w-full max-w-md rounded-md border px-2 text-sm"
+                        >
+                            <option value="">Any due date</option>
+                            <option value="overdue">Overdue</option>
+                            <option value="today">Due today</option>
+                            <option value="this_week">Due this week</option>
+                            <option value="no_due">No due date</option>
+                        </select>
+                    </div>
                     <div className="flex flex-wrap gap-2">
                         <Button type="button" size="sm" onClick={applyBoardFilters}>
                             Apply filters
@@ -261,6 +423,143 @@ export default function ProjectBoard() {
                         </Button>
                     </div>
                 </section>
+
+                {can.manageTasks && project.archived_at === null && (
+                    <section className="space-y-4 rounded-md border border-sidebar-border/70 p-4 dark:border-sidebar-border">
+                        <h2 className="text-sm font-medium text-muted-foreground">Project labels</h2>
+                        <Form
+                            {...LabelController.store.form({
+                                team: team.id,
+                                project: project.id,
+                            })}
+                            options={{ preserveScroll: true }}
+                            resetOnSuccess={['name', 'color']}
+                            className="flex max-w-xl flex-col gap-3 sm:flex-row sm:items-end"
+                        >
+                            {({ processing, errors: le }) => (
+                                <>
+                                    <BoardFilterHiddenFields />
+                                    <div className="grid min-w-0 flex-1 gap-1">
+                                        <Label htmlFor="new-label-name" className="text-xs">
+                                            New label name
+                                        </Label>
+                                        <Input
+                                            id="new-label-name"
+                                            name="name"
+                                            required
+                                            maxLength={100}
+                                            placeholder="e.g. Bug"
+                                            className="text-sm"
+                                        />
+                                        <InputError message={le.name} />
+                                    </div>
+                                    <div className="grid w-full gap-1 sm:w-40">
+                                        <Label htmlFor="new-label-color" className="text-xs">
+                                            Color (optional)
+                                        </Label>
+                                        <Input
+                                            id="new-label-color"
+                                            name="color"
+                                            maxLength={32}
+                                            placeholder="#ef4444"
+                                            className="text-sm"
+                                        />
+                                        <InputError message={le.color} />
+                                    </div>
+                                    <Button type="submit" size="sm" disabled={processing}>
+                                        {processing && <Spinner />}
+                                        Add label
+                                    </Button>
+                                </>
+                            )}
+                        </Form>
+                        {labels.length > 0 ? (
+                            <ul className="divide-y rounded-md border text-sm">
+                                {labels.map((l) => (
+                                    <li
+                                        key={l.id}
+                                        className="flex flex-col gap-3 p-3 sm:flex-row sm:items-end sm:justify-between"
+                                    >
+                                        <Form
+                                            {...LabelController.update.form({
+                                                team: team.id,
+                                                project: project.id,
+                                                label: l.id,
+                                            })}
+                                            options={{ preserveScroll: true }}
+                                            className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-end"
+                                        >
+                                            {({ processing, errors: ue }) => (
+                                                <>
+                                                    <BoardFilterHiddenFields />
+                                                    <div className="grid min-w-0 flex-1 gap-1">
+                                                        <Label className="sr-only" htmlFor={`label-name-${l.id}`}>
+                                                            Name
+                                                        </Label>
+                                                        <Input
+                                                            id={`label-name-${l.id}`}
+                                                            name="name"
+                                                            required
+                                                            maxLength={100}
+                                                            defaultValue={l.name}
+                                                            className="text-sm"
+                                                        />
+                                                        <InputError message={ue.name} />
+                                                    </div>
+                                                    <div className="grid w-full gap-1 sm:w-36">
+                                                        <Label className="sr-only" htmlFor={`label-color-${l.id}`}>
+                                                            Color
+                                                        </Label>
+                                                        <Input
+                                                            id={`label-color-${l.id}`}
+                                                            name="color"
+                                                            maxLength={32}
+                                                            defaultValue={l.color ?? ''}
+                                                            placeholder="Color"
+                                                            className="text-sm"
+                                                        />
+                                                        <InputError message={ue.color} />
+                                                    </div>
+                                                    <Button type="submit" size="sm" variant="secondary" disabled={processing}>
+                                                        {processing && <Spinner />}
+                                                        Save
+                                                    </Button>
+                                                </>
+                                            )}
+                                        </Form>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            className="shrink-0"
+                                            onClick={() => {
+                                                if (
+                                                    !window.confirm(
+                                                        `Delete label “${l.name}”? It will be removed from all tasks.`,
+                                                    )
+                                                ) {
+                                                    return;
+                                                }
+                                                router.delete(
+                                                    LabelController.destroy.url({
+                                                        team: team.id,
+                                                        project: project.id,
+                                                        label: l.id,
+                                                    }),
+                                                    { preserveScroll: true },
+                                                );
+                                            }}
+                                        >
+                                            Delete
+                                        </Button>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p className="text-xs text-muted-foreground">No labels yet. Add one to filter tasks.</p>
+                        )}
+                    </section>
+                )}
 
                 {can.manageColumns && (
                     <section className="max-w-md space-y-4 rounded-md border border-sidebar-border/70 p-4 dark:border-sidebar-border">
@@ -305,9 +604,15 @@ export default function ProjectBoard() {
                 )}
 
                 <section className="space-y-3">
-                    <h2 className="text-sm font-medium text-muted-foreground">
-                        Columns
-                    </h2>
+                    <div className="space-y-1">
+                        <h2 className="text-sm font-medium text-muted-foreground">Columns</h2>
+                        {can.manageTasks && hasActiveBoardFilters(filters) ? (
+                            <p className="text-xs text-amber-700 dark:text-amber-400">
+                                Con filtros activos no se puede reordenar por arrastre; limpia los filtros o usa mover
+                                columna / menú de tarea.
+                            </p>
+                        ) : null}
+                    </div>
                     {columns.length === 0 ? (
                         <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-sidebar-border/70 py-12 text-center dark:border-sidebar-border">
                             <LayoutGrid
@@ -322,8 +627,19 @@ export default function ProjectBoard() {
                             </p>
                         </div>
                     ) : (
-                        <div className="flex gap-4 overflow-x-auto pb-2">
-                            {columns.map((col, index) => (
+                        <BoardTasksDnd
+                            teamId={team.id}
+                            projectId={project.id}
+                            filters={filters}
+                            disabled={!boardTaskDnDActive}
+                            columns={columns}
+                        >
+                            {({ taskIdsByColumn, SortableTask, ColumnDropZone }) => (
+                                <div className="flex gap-4 overflow-x-auto pb-2">
+                                    {columns.map((col, index) => {
+                                        const orderedTasks = boardTasksForColumn(col, taskIdsByColumn, taskById);
+
+                                        return (
                                 <article
                                     key={col.id}
                                     className="flex w-80 shrink-0 flex-col rounded-lg border border-sidebar-border/70 bg-card shadow-sm dark:border-sidebar-border"
@@ -340,28 +656,110 @@ export default function ProjectBoard() {
                                     </div>
 
                                     <div className="flex flex-1 flex-col border-b border-border">
-                                        {col.tasks.length === 0 ? (
-                                            <p className="p-3 text-xs text-muted-foreground">
-                                                No tasks in this column.
-                                            </p>
+                                        {orderedTasks.length === 0 ? (
+                                            <div className="flex flex-col gap-2 p-3">
+                                                <p className="text-xs text-muted-foreground">
+                                                    No tasks in this column.
+                                                </p>
+                                                {boardTaskDnDActive ? (
+                                                    <ColumnDropZone columnId={col.id} disabled={false} />
+                                                ) : null}
+                                            </div>
                                         ) : (
-                                            <ul className="max-h-112 space-y-3 overflow-y-auto p-3">
-                                                {col.tasks.map((task) => (
-                                                    <li
-                                                        key={task.id}
-                                                        className="rounded-md border border-border/60 bg-muted/40 p-2.5 text-sm dark:bg-muted/20"
-                                                    >
-                                                        <div className="mb-2 flex justify-end">
-                                                            <Link
-                                                                href={taskCommentsIndex.url({
-                                                                    team: team.id,
-                                                                    project: project.id,
-                                                                    task: task.id,
-                                                                })}
-                                                                className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+                                            (() => {
+                                                const taskList = (
+                                                    <ul className="max-h-112 space-y-3 overflow-y-auto p-3">
+                                                        {orderedTasks.map((task) => (
+                                                            <SortableTask
+                                                                key={task.id}
+                                                                taskId={task.id}
+                                                                disabled={!boardTaskDnDActive}
                                                             >
-                                                                Comments
-                                                            </Link>
+                                                                {(bag) => (
+                                                                    <li
+                                                                        ref={bag.setNodeRef}
+                                                                        style={bag.style}
+                                                                        className={cn(
+                                                                            'rounded-md border border-border/60 bg-muted/40 p-2.5 text-sm dark:bg-muted/20',
+                                                                            boardTaskDnDActive &&
+                                                                                bag.isDragging &&
+                                                                                'opacity-70 ring-2 ring-ring/40',
+                                                                        )}
+                                                                    >
+                                                                        <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+                                                                            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 text-xs">
+                                                                                {boardTaskDnDActive ? (
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        className="text-muted-foreground hover:text-foreground touch-none rounded p-0.5"
+                                                                                        ref={bag.setActivatorNodeRef}
+                                                                                        aria-label="Arrastrar tarea"
+                                                                                        {...bag.listeners}
+                                                                                        {...bag.attributes}
+                                                                                    >
+                                                                                        <GripVertical
+                                                                                            className="size-4 shrink-0"
+                                                                                            aria-hidden
+                                                                                        />
+                                                                                    </button>
+                                                                                ) : null}
+                                                                {task.labels.map((lb) => (
+                                                                    <span
+                                                                        key={lb.id}
+                                                                        className="inline-flex max-w-full items-center truncate rounded-full border px-2 py-0.5 font-medium text-muted-foreground"
+                                                                        style={
+                                                                            lb.color
+                                                                                ? {
+                                                                                      borderColor: lb.color,
+                                                                                  }
+                                                                                : undefined
+                                                                        }
+                                                                    >
+                                                                        {lb.name}
+                                                                    </span>
+                                                                ))}
+                                                                {task.checklist_total > 0 && (
+                                                                    <span className="tabular-nums text-muted-foreground">
+                                                                        Checklist {task.checklist_done}/
+                                                                        {task.checklist_total}
+                                                                    </span>
+                                                                )}
+                                                                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                                                    {priorityLabel(task.priority)}
+                                                                </span>
+                                                                {(() => {
+                                                                    const hint = dueHint(
+                                                                        task.due_date,
+                                                                        task.is_completed,
+                                                                    );
+
+                                                                    return hint ? (
+                                                                        <span className={hint.className}>{hint.text}</span>
+                                                                    ) : null;
+                                                                })()}
+                                                            </div>
+                                                            <div className="flex shrink-0 flex-col items-end gap-1">
+                                                                <Link
+                                                                    href={taskShow.url({
+                                                                        team: team.id,
+                                                                        project: project.id,
+                                                                        task: task.id,
+                                                                    })}
+                                                                    className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+                                                                >
+                                                                    Detail
+                                                                </Link>
+                                                                <Link
+                                                                    href={taskCommentsIndex.url({
+                                                                        team: team.id,
+                                                                        project: project.id,
+                                                                        task: task.id,
+                                                                    })}
+                                                                    className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+                                                                >
+                                                                    Comments
+                                                                </Link>
+                                                            </div>
                                                         </div>
                                                         {can.manageTasks ? (
                                                             <div className="flex flex-col gap-3">
@@ -483,6 +881,99 @@ export default function ProjectBoard() {
                                                                                     }
                                                                                 />
                                                                             </div>
+                                                                            <div className="grid gap-1">
+                                                                                <Label
+                                                                                    className="text-xs"
+                                                                                    htmlFor={`task-due-${task.id}`}
+                                                                                >
+                                                                                    Due date
+                                                                                </Label>
+                                                                                <Input
+                                                                                    id={`task-due-${task.id}`}
+                                                                                    type="date"
+                                                                                    name="due_date"
+                                                                                    defaultValue={
+                                                                                        task.due_date ?? ''
+                                                                                    }
+                                                                                    className="text-sm"
+                                                                                />
+                                                                                <InputError
+                                                                                    message={ue.due_date}
+                                                                                />
+                                                                                <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        name="clear_due_date"
+                                                                                        value="1"
+                                                                                        className="size-3.5 rounded border"
+                                                                                    />
+                                                                                    Clear due date
+                                                                                </label>
+                                                                            </div>
+                                                                            <div className="grid gap-1">
+                                                                                <Label
+                                                                                    className="text-xs"
+                                                                                    htmlFor={`task-priority-${task.id}`}
+                                                                                >
+                                                                                    Priority
+                                                                                </Label>
+                                                                                <select
+                                                                                    id={`task-priority-${task.id}`}
+                                                                                    name="priority"
+                                                                                    defaultValue={task.priority}
+                                                                                    className="border-input bg-background h-9 w-full rounded-md border px-2 text-xs"
+                                                                                >
+                                                                                    <option value="low">Low</option>
+                                                                                    <option value="medium">
+                                                                                        Medium
+                                                                                    </option>
+                                                                                    <option value="high">High</option>
+                                                                                </select>
+                                                                                <InputError
+                                                                                    message={ue.priority}
+                                                                                />
+                                                                            </div>
+                                                                            {labels.length > 0 && (
+                                                                                <div className="grid gap-1">
+                                                                                    <input
+                                                                                        type="hidden"
+                                                                                        name="sync_label_ids"
+                                                                                        value="1"
+                                                                                    />
+                                                                                    <Label
+                                                                                        className="text-xs"
+                                                                                        htmlFor={`task-labels-${task.id}`}
+                                                                                    >
+                                                                                        Labels
+                                                                                    </Label>
+                                                                                    <select
+                                                                                        id={`task-labels-${task.id}`}
+                                                                                        name="label_ids[]"
+                                                                                        multiple
+                                                                                        defaultValue={task.labels.map(
+                                                                                            (lb) =>
+                                                                                                String(lb.id),
+                                                                                        )}
+                                                                                        className="border-input bg-background min-h-[4.5rem] w-full rounded-md border px-2 py-1 text-xs"
+                                                                                        size={Math.min(
+                                                                                            5,
+                                                                                            labels.length,
+                                                                                        )}
+                                                                                    >
+                                                                                        {labels.map((lb) => (
+                                                                                            <option
+                                                                                                key={lb.id}
+                                                                                                value={lb.id}
+                                                                                            >
+                                                                                                {lb.name}
+                                                                                            </option>
+                                                                                        ))}
+                                                                                    </select>
+                                                                                    <InputError
+                                                                                        message={ue.label_ids}
+                                                                                    />
+                                                                                </div>
+                                                                            )}
                                                                             <Button
                                                                                 type="submit"
                                                                                 size="sm"
@@ -609,6 +1100,11 @@ export default function ProjectBoard() {
                                                                 <p className="font-medium leading-snug">
                                                                     {task.title}
                                                                 </p>
+                                                                {task.is_completed && (
+                                                                    <p className="mt-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                                                                        Done
+                                                                    </p>
+                                                                )}
                                                                 {task.description && (
                                                                     <p className="mt-1 text-xs text-muted-foreground">
                                                                         {task.description}
@@ -619,12 +1115,60 @@ export default function ProjectBoard() {
                                                                         {task.assignee.name}
                                                                     </p>
                                                                 )}
+                                                                {task.checklist_total > 0 && (
+                                                                    <p className="mt-1 text-xs text-muted-foreground">
+                                                                        Checklist {task.checklist_done}/
+                                                                        {task.checklist_total}
+                                                                    </p>
+                                                                )}
+                                                                <div className="mt-1 flex flex-wrap gap-1">
+                                                                    {task.labels.map((lb) => (
+                                                                        <span
+                                                                            key={lb.id}
+                                                                            className="inline-flex max-w-full truncate rounded-full border px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+                                                                            style={
+                                                                                lb.color
+                                                                                    ? {
+                                                                                          borderColor: lb.color,
+                                                                                      }
+                                                                                    : undefined
+                                                                            }
+                                                                        >
+                                                                            {lb.name}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                                <p className="mt-1 text-xs text-muted-foreground">
+                                                                    {priorityLabel(task.priority)}
+                                                                    {task.due_date
+                                                                        ? ` · Due ${task.due_date}`
+                                                                        : ''}
+                                                                </p>
                                                             </>
                                                         )}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        )}
+                                                                    </li>
+                                                                )}
+                                                            </SortableTask>
+                                                        ))}
+                                                    </ul>
+                                                );
+
+                                                return boardTaskDnDActive ? (
+                                                    <SortableContext
+                                                        items={orderedTasks.map((t) => String(t.id))}
+                                                        strategy={verticalListSortingStrategy}
+                                                    >
+                                                        {taskList}
+                                                        <div className="px-3 pb-3">
+                                                            <ColumnDropZone columnId={col.id} disabled={false} />
+                                                        </div>
+                                                    </SortableContext>
+                                                ) : (
+                                                    taskList
+                                                );
+                                            })()
+                                        )
+                                        }
                                     </div>
 
                                     {can.manageTasks && (
@@ -641,10 +1185,7 @@ export default function ProjectBoard() {
                                                 options={{
                                                     preserveScroll: true,
                                                 }}
-                                                resetOnSuccess={[
-                                                    'title',
-                                                    'description',
-                                                ]}
+                                                resetOnSuccess={['title', 'description']}
                                                 className="space-y-2"
                                             >
                                                 {({ processing, errors: te }) => (
@@ -718,6 +1259,64 @@ export default function ProjectBoard() {
                                                                 message={te.assignee_id}
                                                             />
                                                         </div>
+                                                        <div className="grid gap-1">
+                                                            <Label
+                                                                className="text-xs text-muted-foreground"
+                                                                htmlFor={`new-task-due-${col.id}`}
+                                                            >
+                                                                Due date
+                                                            </Label>
+                                                            <Input
+                                                                id={`new-task-due-${col.id}`}
+                                                                type="date"
+                                                                name="due_date"
+                                                                className="text-sm"
+                                                            />
+                                                            <InputError message={te.due_date} />
+                                                        </div>
+                                                        <div className="grid gap-1">
+                                                            <Label
+                                                                className="text-xs text-muted-foreground"
+                                                                htmlFor={`new-task-priority-${col.id}`}
+                                                            >
+                                                                Priority
+                                                            </Label>
+                                                            <select
+                                                                id={`new-task-priority-${col.id}`}
+                                                                name="priority"
+                                                                defaultValue="medium"
+                                                                className="border-input bg-background h-9 w-full rounded-md border px-2 text-xs"
+                                                            >
+                                                                <option value="low">Low</option>
+                                                                <option value="medium">Medium</option>
+                                                                <option value="high">High</option>
+                                                            </select>
+                                                            <InputError message={te.priority} />
+                                                        </div>
+                                                        {labels.length > 0 && (
+                                                            <div className="grid gap-1">
+                                                                <Label
+                                                                    className="text-xs text-muted-foreground"
+                                                                    htmlFor={`new-task-labels-${col.id}`}
+                                                                >
+                                                                    Labels
+                                                                </Label>
+                                                                <select
+                                                                    id={`new-task-labels-${col.id}`}
+                                                                    name="label_ids[]"
+                                                                    multiple
+                                                                    className="border-input bg-background min-h-[4.5rem] w-full rounded-md border px-2 py-1 text-xs"
+                                                                    size={Math.min(5, labels.length)}
+                                                                >
+                                                                    {labels.map((lb) => (
+                                                                        <option key={lb.id} value={lb.id}>
+                                                                            {lb.name}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
+                                                                <InputError message={te.label_ids} />
+                                                            </div>
+                                                        )}
                                                         <Button
                                                             type="submit"
                                                             size="sm"
@@ -846,8 +1445,11 @@ export default function ProjectBoard() {
                                         </div>
                                     )}
                                 </article>
-                            ))}
-                        </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </BoardTasksDnd>
                     )}
                 </section>
             </div>

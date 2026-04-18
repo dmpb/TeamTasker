@@ -52,6 +52,9 @@ class DashboardService
             'id' => $task->id,
             'title' => $task->title,
             'updated_at' => $task->updated_at?->toIso8601String(),
+            'due_date' => $task->due_date?->toDateString(),
+            'priority' => $task->priority->value,
+            'is_completed' => $task->isCompleted(),
             'project' => [
                 'id' => $project->id,
                 'name' => $project->name,

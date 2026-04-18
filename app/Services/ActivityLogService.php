@@ -37,6 +37,31 @@ class ActivityLogService
         );
     }
 
+    /**
+     * @param  callable(Collection<int, ActivityLog>): void  $callback
+     */
+    public function eachProjectLogChunk(
+        Project $project,
+        int $chunkSize,
+        callable $callback,
+        ?string $event = null,
+        ?int $actorId = null,
+        ?string $dateFrom = null,
+        ?string $dateTo = null,
+        ?string $query = null,
+    ): void {
+        $this->activityLogRepository->chunkForProject(
+            $project,
+            $chunkSize,
+            $callback,
+            $event,
+            $actorId,
+            $dateFrom,
+            $dateTo,
+            $query,
+        );
+    }
+
     public function recordTaskCreated(Task $task, ?User $actor = null): void
     {
         $this->activityLogRepository->createLog(
@@ -81,6 +106,26 @@ class ActivityLogService
             project: $task->project,
             actor: $actor,
             event: 'task.deleted',
+            subject: $task,
+        );
+    }
+
+    public function recordTaskCompleted(Task $task, ?User $actor = null): void
+    {
+        $this->activityLogRepository->createLog(
+            project: $task->project,
+            actor: $actor,
+            event: 'task.completed',
+            subject: $task,
+        );
+    }
+
+    public function recordTaskReopened(Task $task, ?User $actor = null): void
+    {
+        $this->activityLogRepository->createLog(
+            project: $task->project,
+            actor: $actor,
+            event: 'task.reopened',
             subject: $task,
         );
     }

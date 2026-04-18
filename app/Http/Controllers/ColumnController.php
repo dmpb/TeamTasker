@@ -8,6 +8,7 @@ use App\Http\Requests\ReorderColumnsRequest;
 use App\Http\Requests\StoreColumnRequest;
 use App\Http\Requests\UpdateColumnRequest;
 use App\Models\Column;
+use App\Models\Label;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\Team;
@@ -35,14 +36,26 @@ class ColumnController extends Controller
         /** @var User|null $user */
         $user = $request->user();
 
-        /** @var array{ filter_column?: int|null, filter_assignee?: int|null, search?: string|null } $filters */
+        /** @var array{
+         *     filter_column?: int|null,
+         *     filter_assignee?: int|null,
+         *     search?: string|null,
+         *     filter_label?: int|null,
+         *     filter_priority?: string|null,
+         *     filter_due?: string|null
+         * } $filters */
         $filters = $request->validated();
+
+        $project->loadMissing('labels');
 
         $columns = $this->taskService->boardColumnsWithTasks(
             $project,
             $filters['filter_column'] ?? null,
             $filters['filter_assignee'] ?? null,
             $filters['search'] ?? null,
+            $filters['filter_label'] ?? null,
+            $filters['filter_priority'] ?? null,
+            $filters['filter_due'] ?? null,
         );
 
         $canManageTasks = $user?->can('update', $project) ?? false;
@@ -54,6 +67,13 @@ class ColumnController extends Controller
                 'name' => $project->name,
                 'archived_at' => $project->archived_at?->toIso8601String(),
             ],
+            'labels' => $project->labels->map(static function (Label $label): array {
+                return [
+                    'id' => $label->id,
+                    'name' => $label->name,
+                    'color' => $label->color,
+                ];
+            })->values()->all(),
             'columns' => $columns->map(static function (Column $column): array {
                 return [
                     'id' => $column->id,
@@ -65,6 +85,19 @@ class ColumnController extends Controller
                             'title' => $task->title,
                             'description' => $task->description,
                             'position' => $task->position,
+                            'due_date' => $task->due_date?->toDateString(),
+                            'priority' => $task->priority->value,
+                            'completed_at' => $task->completed_at?->toIso8601String(),
+                            'is_completed' => $task->isCompleted(),
+                            'checklist_done' => (int) ($task->checklist_items_done ?? 0),
+                            'checklist_total' => (int) ($task->checklist_items_total ?? 0),
+                            'labels' => $task->labels->map(static function (Label $l): array {
+                                return [
+                                    'id' => $l->id,
+                                    'name' => $l->name,
+                                    'color' => $l->color,
+                                ];
+                            })->values()->all(),
                             'assignee' => $task->assignee_id === null || $task->assignee === null
                                 ? null
                                 : [
@@ -86,6 +119,9 @@ class ColumnController extends Controller
                 'filter_column' => $filters['filter_column'] ?? null,
                 'filter_assignee' => $filters['filter_assignee'] ?? null,
                 'search' => $filters['search'] ?? '',
+                'filter_label' => $filters['filter_label'] ?? null,
+                'filter_priority' => $filters['filter_priority'] ?? '',
+                'filter_due' => $filters['filter_due'] ?? '',
             ],
         ]);
     }

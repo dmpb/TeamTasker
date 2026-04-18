@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { index as teamsIndex, show as teamsShow } from '@/routes/teams';
-import { index as projectActivityIndex } from '@/routes/teams/projects/activity';
+import { exportMethod, index as projectActivityIndex } from '@/routes/teams/projects/activity';
 import { board as projectBoard, index as teamProjectsIndex } from '@/routes/teams/projects';
 import type { BreadcrumbItem } from '@/types';
 
@@ -31,6 +31,9 @@ type ProjectActivityPageProps = {
         date_to: string;
         q: string;
     };
+    can: {
+        exportActivityLog: boolean;
+    };
 };
 
 const EVENT_FILTER_OPTIONS: { value: string; label: string }[] = [
@@ -42,6 +45,8 @@ const EVENT_FILTER_OPTIONS: { value: string; label: string }[] = [
     { value: 'comment.created', label: 'Comment created' },
     { value: 'comment.updated', label: 'Comment updated' },
     { value: 'comment.deleted', label: 'Comment deleted' },
+    { value: 'task.completed', label: 'Task completed' },
+    { value: 'task.reopened', label: 'Task reopened' },
 ];
 
 function eventLabel(event: string): string {
@@ -53,6 +58,8 @@ function eventLabel(event: string): string {
         'comment.created': 'Comment created',
         'comment.updated': 'Comment updated',
         'comment.deleted': 'Comment deleted',
+        'task.completed': 'Task completed',
+        'task.reopened': 'Task reopened',
     };
 
     return labels[event] ?? event;
@@ -117,9 +124,37 @@ function formatDateTime(iso: string | null): string {
     }).format(new Date(iso));
 }
 
+function activityExportHref(
+    teamId: number,
+    projectId: number,
+    filters: ProjectActivityPageProps['filters'],
+): string {
+    const query: Record<string, string> = {};
+    if (filters.event !== '') {
+        query.event = filters.event;
+    }
+    if (filters.actor_id != null) {
+        query.actor_id = String(filters.actor_id);
+    }
+    if (filters.date_from !== '') {
+        query.date_from = filters.date_from;
+    }
+    if (filters.date_to !== '') {
+        query.date_to = filters.date_to;
+    }
+    if (filters.q.trim() !== '') {
+        query.q = filters.q.trim();
+    }
+
+    return exportMethod.url(
+        { team: teamId, project: projectId },
+        { query: Object.keys(query).length ? query : undefined },
+    );
+}
+
 export default function ProjectActivityIndex() {
     const page = usePage<ProjectActivityPageProps>();
-    const { team, project, activityLogs, actors, filters } = page.props;
+    const { team, project, activityLogs, actors, filters, can } = page.props;
 
     const [draftEvent, setDraftEvent] = useState(filters.event);
     const [draftActorId, setDraftActorId] = useState(
@@ -267,6 +302,11 @@ export default function ProjectActivityIndex() {
                         <Button type="button" size="sm" variant="outline" onClick={clearActivityFilters}>
                             Clear
                         </Button>
+                        {can.exportActivityLog ? (
+                            <Button type="button" size="sm" variant="secondary" asChild>
+                                <a href={activityExportHref(team.id, project.id, filters)}>Export CSV</a>
+                            </Button>
+                        ) : null}
                     </div>
                 </section>
 

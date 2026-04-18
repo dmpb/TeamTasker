@@ -36,6 +36,9 @@ class StoreColumnRequest extends FormRequest
             'search' => ['sometimes', 'nullable', 'string', 'max:255'],
             'filter_column' => ['sometimes', 'nullable', 'integer'],
             'filter_assignee' => ['sometimes', 'nullable', 'integer'],
+            'filter_label' => ['sometimes', 'nullable', 'integer'],
+            'filter_priority' => ['sometimes', 'nullable', 'string', 'max:20'],
+            'filter_due' => ['sometimes', 'nullable', 'string', 'max:32'],
         ];
     }
 }

@@ -8,14 +8,16 @@ use App\Models\Project;
 use App\Models\Team;
 use App\Models\User;
 use App\Services\ActivityLogService;
+use Illuminate\Support\Facades\Response as ResponseFactory;
 use Inertia\Inertia;
-use Inertia\Response;
+use Inertia\Response as InertiaResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ActivityLogController extends Controller
 {
     public function __construct(protected ActivityLogService $activityLogService) {}
 
-    public function index(ActivityLogFilterRequest $request, Team $team, Project $project): Response
+    public function index(ActivityLogFilterRequest $request, Team $team, Project $project): InertiaResponse
     {
         $this->authorize('viewAny', [ActivityLog::class, $project]);
 
@@ -82,6 +84,58 @@ class ActivityLogController extends Controller
                 'date_to' => $filters['date_to'] ?? '',
                 'q' => $filters['q'] ?? '',
             ],
+            'can' => [
+                'exportActivityLog' => $request->user()?->can('exportActivityLog', $project) ?? false,
+            ],
+        ]);
+    }
+
+    public function exportCsv(ActivityLogFilterRequest $request, Team $team, Project $project): StreamedResponse
+    {
+        $this->authorize('exportActivityLog', $project);
+
+        /** @var array{ event?: string|null, actor_id?: int|null, date_from?: string|null, date_to?: string|null, q?: string|null } $filters */
+        $filters = $request->validated();
+
+        $filename = 'project-'.$project->id.'-activity.csv';
+
+        return ResponseFactory::streamDownload(function () use ($project, $filters): void {
+            $handle = fopen('php://output', 'w');
+
+            if ($handle === false) {
+                return;
+            }
+
+            fputcsv($handle, ['id', 'event', 'created_at', 'actor_id', 'actor_name', 'subject_type', 'subject_id', 'metadata']);
+
+            $this->activityLogService->eachProjectLogChunk(
+                $project,
+                500,
+                static function ($chunk) use ($handle): void {
+                    foreach ($chunk as $log) {
+                        /** @var ActivityLog $log */
+                        fputcsv($handle, [
+                            $log->id,
+                            $log->event,
+                            $log->created_at?->toIso8601String() ?? '',
+                            $log->actor_id ?? '',
+                            $log->actor?->name ?? '',
+                            class_basename((string) $log->subject_type),
+                            $log->subject_id ?? '',
+                            $log->metadata === null ? '' : json_encode($log->metadata, JSON_THROW_ON_ERROR),
+                        ]);
+                    }
+                },
+                $filters['event'] ?? null,
+                $filters['actor_id'] ?? null,
+                $filters['date_from'] ?? null,
+                $filters['date_to'] ?? null,
+                $filters['q'] ?? null,
+            );
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
         ]);
     }
 }

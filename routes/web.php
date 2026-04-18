@@ -4,8 +4,14 @@ use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\ColumnController;
 use App\Http\Controllers\CommentController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\LabelController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\TaskChecklistItemController;
+use App\Http\Controllers\TaskCompletionController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\TaskDependencyController;
+use App\Http\Controllers\TaskShowController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\TeamInvitationAcceptController;
 use App\Http\Controllers\TeamInvitationController;
@@ -25,6 +31,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('invitations/{token}/accept', [TeamInvitationAcceptController::class, 'accept'])
         ->name('team-invitations.accept');
     Route::get('dashboard', DashboardController::class)->name('dashboard');
+
+    Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
+    Route::post('notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
 
     Route::get('teams', [TeamController::class, 'index'])->name('teams.index');
     Route::post('teams', [TeamController::class, 'store'])->name('teams.store');
@@ -59,6 +69,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('teams/{team}/projects/{project}', [ProjectController::class, 'destroy'])->name('teams.projects.destroy');
 
         Route::get('teams/{team}/projects/{project}/board', [ColumnController::class, 'board'])->name('teams.projects.board');
+        Route::post('teams/{team}/projects/{project}/board/tasks/sync', [TaskController::class, 'syncBoard'])->name('teams.projects.board.tasks.sync');
+        Route::get('teams/{team}/projects/{project}/activity/export', [ActivityLogController::class, 'exportCsv'])->name('teams.projects.activity.export');
         Route::get('teams/{team}/projects/{project}/activity', [ActivityLogController::class, 'index'])->name('teams.projects.activity.index');
         Route::post('teams/{team}/projects/{project}/columns/reorder', [ColumnController::class, 'reorder'])->name('teams.projects.columns.reorder');
         Route::post('teams/{team}/projects/{project}/columns/{column}/tasks', [TaskController::class, 'store'])->name('teams.projects.columns.tasks.store');
@@ -68,6 +80,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('teams/{team}/projects/{project}/tasks/{task}', [TaskController::class, 'update'])->name('teams.projects.tasks.update');
         Route::post('teams/{team}/projects/{project}/tasks/{task}/move', [TaskController::class, 'move'])->name('teams.projects.tasks.move');
         Route::delete('teams/{team}/projects/{project}/tasks/{task}', [TaskController::class, 'destroy'])->name('teams.projects.tasks.destroy');
+
+        Route::get('teams/{team}/projects/{project}/tasks/{task}', TaskShowController::class)->name('teams.projects.tasks.show');
+        Route::post('teams/{team}/projects/{project}/tasks/{task}/complete', [TaskCompletionController::class, 'store'])->name('teams.projects.tasks.complete');
+        Route::delete('teams/{team}/projects/{project}/tasks/{task}/complete', [TaskCompletionController::class, 'destroy'])->name('teams.projects.tasks.incomplete');
+
+        Route::post('teams/{team}/projects/{project}/tasks/{task}/checklist-items/reorder', [TaskChecklistItemController::class, 'reorder'])->name('teams.projects.tasks.checklist-items.reorder');
+        Route::post('teams/{team}/projects/{project}/tasks/{task}/checklist-items', [TaskChecklistItemController::class, 'store'])->name('teams.projects.tasks.checklist-items.store');
+        Route::patch('teams/{team}/projects/{project}/tasks/{task}/checklist-items/{checklistItem}', [TaskChecklistItemController::class, 'update'])->name('teams.projects.tasks.checklist-items.update');
+        Route::delete('teams/{team}/projects/{project}/tasks/{task}/checklist-items/{checklistItem}', [TaskChecklistItemController::class, 'destroy'])->name('teams.projects.tasks.checklist-items.destroy');
+
+        Route::post('teams/{team}/projects/{project}/tasks/{task}/dependencies', [TaskDependencyController::class, 'store'])->name('teams.projects.tasks.dependencies.store');
+        Route::delete('teams/{team}/projects/{project}/tasks/{task}/dependencies/{prerequisiteTask}', [TaskDependencyController::class, 'destroy'])->name('teams.projects.tasks.dependencies.destroy');
+
+        Route::post('teams/{team}/projects/{project}/labels', [LabelController::class, 'store'])->name('teams.projects.labels.store');
+        Route::patch('teams/{team}/projects/{project}/labels/{label}', [LabelController::class, 'update'])->name('teams.projects.labels.update');
+        Route::delete('teams/{team}/projects/{project}/labels/{label}', [LabelController::class, 'destroy'])->name('teams.projects.labels.destroy');
 
         Route::get('teams/{team}/projects/{project}/tasks/{task}/comments', [CommentController::class, 'index'])->name('teams.projects.tasks.comments.index');
         Route::post('teams/{team}/projects/{project}/tasks/{task}/comments', [CommentController::class, 'store'])->name('teams.projects.tasks.comments.store');

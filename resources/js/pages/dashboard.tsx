@@ -10,6 +10,7 @@ import {
     index as teamProjectsIndex,
 } from '@/routes/teams/projects';
 import { index as projectActivityIndex } from '@/routes/teams/projects/activity/index';
+import { show as taskShow } from '@/routes/teams/projects/tasks';
 import { index as taskCommentsIndex } from '@/routes/teams/projects/tasks/comments/index';
 import type { BreadcrumbItem } from '@/types';
 
@@ -17,6 +18,9 @@ type TaskRow = {
     id: number;
     title: string;
     updated_at: string | null;
+    due_date: string | null;
+    priority: string;
+    is_completed: boolean;
     project: { id: number; name: string };
     team: { id: number; name: string };
     column: { id: number; name: string };
@@ -65,6 +69,8 @@ function eventLabel(event: string): string {
         'comment.created': 'Comment created',
         'comment.updated': 'Comment updated',
         'comment.deleted': 'Comment deleted',
+        'task.completed': 'Task completed',
+        'task.reopened': 'Task reopened',
     };
 
     return labels[event] ?? event;
@@ -159,8 +165,31 @@ export default function Dashboard() {
                                                 <p className="text-muted-foreground text-xs">
                                                     {t.team.name} · {t.project.name} · {t.column.name}
                                                 </p>
+                                                <p className="text-muted-foreground mt-0.5 text-xs">
+                                                    {t.is_completed ? (
+                                                        <span className="text-emerald-600 dark:text-emerald-400">
+                                                            Done
+                                                        </span>
+                                                    ) : (
+                                                        <>
+                                                            {t.due_date ? `Due ${t.due_date} · ` : ''}
+                                                            Priority {t.priority}
+                                                        </>
+                                                    )}
+                                                </p>
                                             </div>
                                             <div className="flex shrink-0 flex-wrap gap-2">
+                                                <Button variant="outline" size="sm" asChild>
+                                                    <Link
+                                                        href={taskShow.url({
+                                                            team: t.team.id,
+                                                            project: t.project.id,
+                                                            task: t.id,
+                                                        })}
+                                                    >
+                                                        Detail
+                                                    </Link>
+                                                </Button>
                                                 <Button variant="outline" size="sm" asChild>
                                                     <Link
                                                         href={projectBoard.url({
@@ -255,17 +284,42 @@ export default function Dashboard() {
                                                     {t.team.name} · {t.project.name}
                                                     {t.assignee ? ` · ${t.assignee.name}` : ''}
                                                 </p>
+                                                <p className="text-muted-foreground mt-0.5 text-xs">
+                                                    {t.is_completed ? (
+                                                        <span className="text-emerald-600 dark:text-emerald-400">
+                                                            Done
+                                                        </span>
+                                                    ) : (
+                                                        <>
+                                                            {t.due_date ? `Due ${t.due_date} · ` : ''}
+                                                            Priority {t.priority}
+                                                        </>
+                                                    )}
+                                                </p>
                                             </div>
-                                            <Button variant="link" size="sm" className="h-auto shrink-0 px-0" asChild>
-                                                <Link
-                                                    href={projectBoard.url({
-                                                        team: t.team.id,
-                                                        project: t.project.id,
-                                                    })}
-                                                >
-                                                    Open board
-                                                </Link>
-                                            </Button>
+                                            <div className="flex shrink-0 flex-col gap-1 sm:items-end">
+                                                <Button variant="link" size="sm" className="h-auto shrink-0 px-0" asChild>
+                                                    <Link
+                                                        href={taskShow.url({
+                                                            team: t.team.id,
+                                                            project: t.project.id,
+                                                            task: t.id,
+                                                        })}
+                                                    >
+                                                        Task detail
+                                                    </Link>
+                                                </Button>
+                                                <Button variant="link" size="sm" className="h-auto shrink-0 px-0" asChild>
+                                                    <Link
+                                                        href={projectBoard.url({
+                                                            team: t.team.id,
+                                                            project: t.project.id,
+                                                        })}
+                                                    >
+                                                        Open board
+                                                    </Link>
+                                                </Button>
+                                            </div>
                                         </li>
                                     ))}
                                 </ul>

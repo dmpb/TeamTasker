@@ -75,6 +75,15 @@ class HandleInertiaRequests extends Middleware
                     ->values()
                     ->all();
             },
+            'notificationUnreadCount' => static function () use ($request): int {
+                $user = $request->user();
+
+                if ($user === null) {
+                    return 0;
+                }
+
+                return (int) $user->unreadNotifications()->count();
+            },
         ];
     }
 }

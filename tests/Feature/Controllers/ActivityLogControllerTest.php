@@ -63,7 +63,8 @@ it('shows project activity logs for team members', function () {
             ->has('filters')
             ->where('filters.event', '')
             ->where('filters.actor_id', null)
-            ->where('filters.q', ''));
+            ->where('filters.q', '')
+            ->where('can.exportActivityLog', false));
 });
 
 it('applies activity event filter from query string', function () {
@@ -86,6 +87,18 @@ it('applies activity event filter from query string', function () {
             ->has('activityLogs', 1)
             ->where('activityLogs.0.event', 'task.created')
             ->where('filters.event', 'task.created'));
+});
+
+it('shows export permission for team owners on activity page', function () {
+    $owner = User::factory()->create();
+    $team = Team::factory()->forOwner($owner)->create();
+    $project = Project::factory()->forTeam($team)->create();
+
+    /** @var TestCase $this */
+    $this->actingAs($owner)
+        ->get(route('teams.projects.activity.index', [$team, $project]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->where('can.exportActivityLog', true));
 });
 
 it('returns 404 when the project belongs to another team', function () {

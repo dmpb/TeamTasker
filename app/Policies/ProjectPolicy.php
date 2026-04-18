@@ -47,4 +47,12 @@ class ProjectPolicy
     {
         return $this->update($user, $project);
     }
+
+    /**
+     * Export project activity (CSV) — team owner or team admin only.
+     */
+    public function exportActivityLog(User $user, Project $project): bool
+    {
+        return $user->can('manageProjects', $project->team);
+    }
 }

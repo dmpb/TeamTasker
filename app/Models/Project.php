@@ -68,6 +68,14 @@ class Project extends Model
     }
 
     /**
+     * @return HasMany<Label, $this>
+     */
+    public function labels(): HasMany
+    {
+        return $this->hasMany(Label::class)->orderBy('name');
+    }
+
+    /**
      * @return HasMany<ActivityLog, $this>
      */
     public function activityLogs(): HasMany

@@ -6,6 +6,7 @@ use App\Models\ActivityLog;
 use App\Models\Project;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 
@@ -43,10 +44,45 @@ class ActivityLogRepository
         ?string $dateTo = null,
         ?string $query = null,
     ): Collection {
-        $queryBuilder = ActivityLog::query()
-            ->where('project_id', $project->id)
+        return $this->filteredProjectLogsQuery($project, $event, $actorId, $dateFrom, $dateTo, $query)
             ->with('actor')
-            ->latest();
+            ->latest()
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * @param  callable(Collection<int, ActivityLog>): void  $callback
+     */
+    public function chunkForProject(
+        Project $project,
+        int $chunkSize,
+        callable $callback,
+        ?string $event = null,
+        ?int $actorId = null,
+        ?string $dateFrom = null,
+        ?string $dateTo = null,
+        ?string $query = null,
+    ): void {
+        $this->filteredProjectLogsQuery($project, $event, $actorId, $dateFrom, $dateTo, $query)
+            ->with('actor')
+            ->latest()
+            ->chunkById($chunkSize, $callback);
+    }
+
+    /**
+     * @return Builder<ActivityLog>
+     */
+    private function filteredProjectLogsQuery(
+        Project $project,
+        ?string $event,
+        ?int $actorId,
+        ?string $dateFrom,
+        ?string $dateTo,
+        ?string $query,
+    ) {
+        $queryBuilder = ActivityLog::query()
+            ->where('project_id', $project->id);
 
         if ($event !== null && $event !== '') {
             $queryBuilder->where('event', $event);
@@ -69,6 +105,6 @@ class ActivityLogRepository
             $queryBuilder->where('event', 'like', '%'.$escaped.'%');
         }
 
-        return $queryBuilder->limit($limit)->get();
+        return $queryBuilder;
     }
 }

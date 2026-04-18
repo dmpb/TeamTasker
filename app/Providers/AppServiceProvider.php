@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Models\Label;
+use App\Models\Project;
+use App\Models\Task;
+use App\Models\TaskChecklistItem;
 use App\Models\Team;
 use App\Models\TeamInvitation;
 use Carbon\CarbonImmutable;
@@ -36,6 +40,26 @@ class AppServiceProvider extends ServiceProvider
 
             return TeamInvitation::query()
                 ->where('team_id', $teamId)
+                ->whereKey((int) $value)
+                ->firstOrFail();
+        });
+
+        Route::bind('label', function (string $value, RoutingRoute $route): Label {
+            $project = $route->parameter('project');
+            $projectId = $project instanceof Project ? $project->id : (int) $project;
+
+            return Label::query()
+                ->where('project_id', $projectId)
+                ->whereKey((int) $value)
+                ->firstOrFail();
+        });
+
+        Route::bind('checklistItem', function (string $value, RoutingRoute $route): TaskChecklistItem {
+            $task = $route->parameter('task');
+            $taskId = $task instanceof Task ? $task->id : (int) $task;
+
+            return TaskChecklistItem::query()
+                ->where('task_id', $taskId)
                 ->whereKey((int) $value)
                 ->firstOrFail();
         });

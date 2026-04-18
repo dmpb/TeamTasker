@@ -15,6 +15,7 @@ class CommentService
     public function __construct(
         public CommentRepository $commentRepository,
         public ActivityLogService $activityLogService,
+        public NotificationService $notificationService,
     ) {}
 
     /**
@@ -31,6 +32,9 @@ class CommentService
 
         $comment = $this->commentRepository->createComment($task, $user, $body);
         $this->activityLogService->recordCommentCreated($comment, $actor ?? $user);
+
+        $task->refresh();
+        $this->notificationService->notifyCommentOnAssignedTask($task, $user);
 
         return $comment;
     }

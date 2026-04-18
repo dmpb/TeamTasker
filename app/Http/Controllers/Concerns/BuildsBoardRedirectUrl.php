@@ -13,7 +13,14 @@ trait BuildsBoardRedirectUrl
      */
     protected function boardUrlWithFilters(Team $team, Project $project, Request $request): string
     {
-        $query = collect($request->only(['search', 'filter_column', 'filter_assignee']))
+        $query = collect($request->only([
+            'search',
+            'filter_column',
+            'filter_assignee',
+            'filter_label',
+            'filter_priority',
+            'filter_due',
+        ]))
             ->filter(static fn (mixed $v): bool => $v !== null && $v !== '')
             ->all();
 

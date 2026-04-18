@@ -7,6 +7,7 @@ use App\Models\Team;
 use App\Models\TeamMember;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 
 class TeamRepository
 {
@@ -78,10 +79,12 @@ class TeamRepository
 
         $escaped = addcslashes($trimmed, '%_\\');
 
+        $likeOperator = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+
         return User::query()
-            ->where(function ($inner) use ($escaped): void {
-                $inner->where('email', 'ilike', '%'.$escaped.'%')
-                    ->orWhere('name', 'ilike', '%'.$escaped.'%');
+            ->where(function ($inner) use ($escaped, $likeOperator): void {
+                $inner->where('email', $likeOperator, '%'.$escaped.'%')
+                    ->orWhere('name', $likeOperator, '%'.$escaped.'%');
             })
             ->whereDoesntHave('teamMemberships', function ($members) use ($team): void {
                 $members->where('team_id', $team->id);
