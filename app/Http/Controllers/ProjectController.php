@@ -41,14 +41,31 @@ class ProjectController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        $includeArchived = $request->boolean('include_archived')
-            && $user->can('manageProjects', $team);
+        $canManageProjects = $user->can('manageProjects', $team);
 
-        /** @var array{ q?: string|null } $validated */
+        /** @var array{ q?: string|null, per_page?: int, archive_scope?: string } $validated */
         $validated = $request->validated();
+        $perPage = max(1, min((int) ($validated['per_page'] ?? 12), 50));
         $nameSearch = $validated['q'] ?? null;
 
-        $projects = $this->projectService->listTeamProjects($team, $includeArchived, $nameSearch);
+        $requestedScope = (string) ($validated['archive_scope'] ?? 'active');
+        $archiveScope = $canManageProjects && in_array($requestedScope, ['active', 'all', 'archived'], true)
+            ? $requestedScope
+            : 'active';
+
+        $projects = $this->projectService
+            ->paginateTeamProjects($team, $perPage, $archiveScope, $nameSearch)
+            ->withQueryString();
+
+        $projects->setCollection(
+            $projects->getCollection()->map(static function (Project $project): array {
+                return [
+                    'id' => $project->uuid,
+                    'name' => $project->name,
+                    'archived_at' => $project->archived_at?->toIso8601String(),
+                ];
+            }),
+        );
 
         return Inertia::render('teams/projects/index', [
             'team' => [
@@ -56,19 +73,13 @@ class ProjectController extends Controller
                 'name' => $team->name,
                 'owner_id' => $team->owner_id,
             ],
-            'projects' => $projects->map(static function (Project $project): array {
-                return [
-                    'id' => $project->uuid,
-                    'name' => $project->name,
-                    'archived_at' => $project->archived_at?->toIso8601String(),
-                ];
-            })->values()->all(),
+            'projects' => $projects,
             'can' => [
-                'manageProjects' => $user->can('manageProjects', $team),
-                'showArchived' => $includeArchived,
+                'manageProjects' => $canManageProjects,
             ],
             'filters' => [
                 'q' => $nameSearch ?? '',
+                'archive_scope' => $archiveScope,
             ],
         ]);
     }

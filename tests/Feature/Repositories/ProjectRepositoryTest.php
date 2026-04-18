@@ -14,7 +14,7 @@ it('lists active projects for a team ordered by id desc', function () {
     $newer = Project::factory()->forTeam($team)->create(['name' => 'Newer']);
     Project::factory()->forTeam($team)->archived()->create(['name' => 'Archived']);
 
-    $list = $repository->listProjectsForTeam($team);
+    $list = $repository->paginateProjectsForTeam($team)->getCollection();
 
     expect($list)->toHaveCount(2)
         ->and($list->first()->is($newer))->toBeTrue()
@@ -27,7 +27,7 @@ it('can include archived projects when listing', function () {
     $active = Project::factory()->forTeam($team)->create(['name' => 'Active']);
     $archived = Project::factory()->forTeam($team)->archived()->create(['name' => 'Old']);
 
-    $all = $repository->listProjectsForTeam($team, includeArchived: true);
+    $all = $repository->paginateProjectsForTeam($team, archiveScope: 'all')->getCollection();
 
     expect($all->pluck('id')->all())->toContain($active->id, $archived->id);
 });

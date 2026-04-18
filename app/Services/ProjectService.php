@@ -5,18 +5,19 @@ namespace App\Services;
 use App\Models\Project;
 use App\Models\Team;
 use App\Repositories\ProjectRepository;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class ProjectService
 {
     public function __construct(public ProjectRepository $projectRepository) {}
 
-    /**
-     * @return Collection<int, Project>
-     */
-    public function listTeamProjects(Team $team, bool $includeArchived = false, ?string $nameSearch = null): Collection
-    {
-        return $this->projectRepository->listProjectsForTeam($team, $includeArchived, $nameSearch);
+    public function paginateTeamProjects(
+        Team $team,
+        int $perPage = 12,
+        string $archiveScope = 'active',
+        ?string $nameSearch = null,
+    ): LengthAwarePaginator {
+        return $this->projectRepository->paginateProjectsForTeam($team, $perPage, $archiveScope, $nameSearch);
     }
 
     public function createProject(Team $team, string $name): Project

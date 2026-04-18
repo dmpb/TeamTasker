@@ -4,20 +4,23 @@ namespace App\Repositories;
 
 use App\Models\Project;
 use App\Models\Team;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class ProjectRepository
 {
-    /**
-     * @return Collection<int, Project>
-     */
-    public function listProjectsForTeam(Team $team, bool $includeArchived = false, ?string $nameSearch = null): Collection
-    {
+    public function paginateProjectsForTeam(
+        Team $team,
+        int $perPage = 12,
+        string $archiveScope = 'active',
+        ?string $nameSearch = null,
+    ): LengthAwarePaginator {
         $query = Project::query()
             ->where('team_id', $team->id)
             ->orderByDesc('id');
 
-        if (! $includeArchived) {
+        if ($archiveScope === 'archived') {
+            $query->whereNotNull('archived_at');
+        } elseif ($archiveScope !== 'all') {
             $query->notArchived();
         }
 
@@ -26,7 +29,7 @@ class ProjectRepository
             $query->where('name', 'like', '%'.$escaped.'%');
         }
 
-        return $query->get();
+        return $query->paginate($perPage);
     }
 
     public function createProject(Team $team, string $name): Project

@@ -50,10 +50,11 @@ it('shows projects for a team member with inertia', function () {
             ->component('teams/projects/index')
             ->where('team.name', 'Acme')
             ->where('can.manageProjects', true)
-            ->has('projects', 1)
-            ->where('projects.0.name', 'Board')
+            ->has('projects.data', 1)
+            ->where('projects.data.0.name', 'Board')
             ->has('filters')
-            ->where('filters.q', ''));
+            ->where('filters.q', '')
+            ->where('filters.archive_scope', 'active'));
 });
 
 it('filters team projects by name using the q query parameter', function () {
@@ -67,8 +68,8 @@ it('filters team projects by name using the q query parameter', function () {
         ->get(route('teams.projects.index', [$team, 'q' => 'Alpha']))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->has('projects', 1)
-            ->where('projects.0.name', 'Alpha Board')
+            ->has('projects.data', 1)
+            ->where('projects.data.0.name', 'Alpha Board')
             ->where('filters.q', 'Alpha'));
 });
 
@@ -167,7 +168,7 @@ it('returns 404 when the project belongs to another team', function () {
         ->assertNotFound();
 });
 
-it('ignores include_archived for members without manage permission', function () {
+it('ignores archive scope beyond active for members without manage permission', function () {
     $owner = User::factory()->create();
     $member = User::factory()->create();
     $team = Team::factory()->forOwner($owner)->create();
@@ -178,15 +179,63 @@ it('ignores include_archived for members without manage permission', function ()
     $this->actingAs($member)
         ->get(route('teams.projects.index', [
             'team' => $team,
-            'include_archived' => 1,
+            'archive_scope' => 'all',
         ]))
         ->assertOk()
-        ->assertInertia(fn ($page) => $page->has('projects', 0));
+        ->assertInertia(fn ($page) => $page
+            ->has('projects.data', 0)
+            ->where('filters.archive_scope', 'active'));
+
+    $this->actingAs($member)
+        ->get(route('teams.projects.index', [
+            'team' => $team,
+            'archive_scope' => 'archived',
+        ]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('projects.data', 0)
+            ->where('filters.archive_scope', 'active'));
 });
 
-it('shows archived projects for managers when include_archived is set', function () {
+it('shows archived projects for managers when archive_scope is all', function () {
     $owner = User::factory()->create();
     $team = app(TeamService::class)->createTeam($owner, ['name' => 'T']);
+    Project::factory()->forTeam($team)->archived()->create(['name' => 'Z']);
+
+    /** @var TestCase $this */
+    $this->actingAs($owner)
+        ->get(route('teams.projects.index', [
+            'team' => $team,
+            'archive_scope' => 'all',
+        ]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('filters.archive_scope', 'all')
+            ->has('projects.data', 1));
+});
+
+it('shows only archived projects for managers when archive_scope is archived', function () {
+    $owner = User::factory()->create();
+    $team = app(TeamService::class)->createTeam($owner, ['name' => 'T2']);
+    Project::factory()->forTeam($team)->create(['name' => 'Live']);
+    Project::factory()->forTeam($team)->archived()->create(['name' => 'Gone']);
+
+    /** @var TestCase $this */
+    $this->actingAs($owner)
+        ->get(route('teams.projects.index', [
+            'team' => $team,
+            'archive_scope' => 'archived',
+        ]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('filters.archive_scope', 'archived')
+            ->has('projects.data', 1)
+            ->where('projects.data.0.name', 'Gone'));
+});
+
+it('maps legacy include_archived to archive_scope all for managers', function () {
+    $owner = User::factory()->create();
+    $team = app(TeamService::class)->createTeam($owner, ['name' => 'Legacy']);
     Project::factory()->forTeam($team)->archived()->create(['name' => 'Z']);
 
     /** @var TestCase $this */
@@ -197,8 +246,32 @@ it('shows archived projects for managers when include_archived is set', function
         ]))
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->where('can.showArchived', true)
-            ->has('projects', 1));
+            ->where('filters.archive_scope', 'all')
+            ->has('projects.data', 1));
+});
+
+it('paginates projects on the team projects index', function () {
+    $owner = User::factory()->create();
+    $team = app(TeamService::class)->createTeam($owner, ['name' => 'Paged']);
+    Project::factory()->count(15)->forTeam($team)->create();
+
+    /** @var TestCase $this */
+    $this->actingAs($owner)
+        ->get(route('teams.projects.index', $team))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('projects.current_page', 1)
+            ->where('projects.last_page', 2)
+            ->has('projects.data', 12)
+            ->where('projects.next_page_url', fn ($url) => is_string($url) && str_contains($url, 'page=2')));
+
+    $this->actingAs($owner)
+        ->get(route('teams.projects.index', ['team' => $team, 'page' => 2]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('projects.current_page', 2)
+            ->has('projects.data', 3)
+            ->where('projects.prev_page_url', fn ($url) => is_string($url) && str_contains($url, 'page=1')));
 });
 
 it('validates project name on store', function () {
