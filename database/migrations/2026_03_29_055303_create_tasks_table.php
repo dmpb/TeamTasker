@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('tasks', function (Blueprint $table) {
             $table->id();
+            $table->uuid('uuid')->unique();
             $table->foreignId('project_id')->index();
             $table->foreignId('column_id')->index();
             $table->foreignId('assignee_id')->nullable()->index();

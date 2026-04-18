@@ -51,10 +51,14 @@ class ProjectController extends Controller
         $projects = $this->projectService->listTeamProjects($team, $includeArchived, $nameSearch);
 
         return Inertia::render('teams/projects/index', [
-            'team' => $team->only(['id', 'name', 'owner_id']),
+            'team' => [
+                'id' => $team->uuid,
+                'name' => $team->name,
+                'owner_id' => $team->owner_id,
+            ],
             'projects' => $projects->map(static function (Project $project): array {
                 return [
-                    'id' => $project->id,
+                    'id' => $project->uuid,
                     'name' => $project->name,
                     'archived_at' => $project->archived_at?->toIso8601String(),
                 ];

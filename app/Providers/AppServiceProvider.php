@@ -36,17 +36,21 @@ class AppServiceProvider extends ServiceProvider
 
         Route::bind('invitation', function (string $value, RoutingRoute $route): TeamInvitation {
             $team = $route->parameter('team');
-            $teamId = $team instanceof Team ? $team->id : (int) $team;
+            $teamId = $team instanceof Team
+                ? $team->id
+                : Team::query()->where('uuid', $team)->value('id');
 
             return TeamInvitation::query()
                 ->where('team_id', $teamId)
-                ->whereKey((int) $value)
+                ->where('uuid', $value)
                 ->firstOrFail();
         });
 
         Route::bind('label', function (string $value, RoutingRoute $route): Label {
             $project = $route->parameter('project');
-            $projectId = $project instanceof Project ? $project->id : (int) $project;
+            $projectId = $project instanceof Project
+                ? $project->id
+                : Project::query()->where('uuid', $project)->value('id');
 
             return Label::query()
                 ->where('project_id', $projectId)
@@ -56,7 +60,9 @@ class AppServiceProvider extends ServiceProvider
 
         Route::bind('checklistItem', function (string $value, RoutingRoute $route): TaskChecklistItem {
             $task = $route->parameter('task');
-            $taskId = $task instanceof Task ? $task->id : (int) $task;
+            $taskId = $task instanceof Task
+                ? $task->id
+                : Task::query()->where('uuid', $task)->value('id');
 
             return TaskChecklistItem::query()
                 ->where('task_id', $taskId)

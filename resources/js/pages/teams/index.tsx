@@ -12,7 +12,7 @@ import { index as teamProjectsIndex } from '@/routes/teams/projects';
 import type { BreadcrumbItem } from '@/types';
 
 type Team = {
-    id: number | string;
+    id: string;
     name?: string;
 };
 
@@ -94,7 +94,7 @@ export default function TeamsIndex() {
                                 <li key={team.id} className="px-3 py-2">
                                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                                         <Link
-                                            href={teamsShow(Number(team.id))}
+                                            href={teamsShow(team.id)}
                                             className="text-sm font-medium hover:underline"
                                         >
                                             {team.name ?? team.id}
@@ -106,9 +106,7 @@ export default function TeamsIndex() {
                                             ·
                                         </span>
                                         <Link
-                                            href={teamProjectsIndex(
-                                                Number(team.id),
-                                            )}
+                                            href={teamProjectsIndex(team.id)}
                                             className="text-xs text-muted-foreground underline-offset-4 hover:underline"
                                         >
                                             Projects

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUuid;
 use Database\Factories\TeamInvitationFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,6 +14,7 @@ class TeamInvitation extends Model
 {
     /** @use HasFactory<TeamInvitationFactory> */
     use HasFactory;
+    use HasPublicUuid;
 
     /**
      * @return array<string, string>
@@ -54,5 +56,10 @@ class TeamInvitation extends Model
     public function isUsable(): bool
     {
         return ! $this->isAccepted() && ! $this->isCancelled() && ! $this->isExpired();
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
     }
 }

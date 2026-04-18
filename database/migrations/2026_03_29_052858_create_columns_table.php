@@ -15,6 +15,7 @@ return new class extends Migration
     {
         Schema::create('board_columns', function (Blueprint $table) {
             $table->id();
+            $table->uuid('uuid')->unique();
             $table->foreignId('project_id')->index();
             $table->string('name');
             $table->unsignedInteger('position')->default(0);

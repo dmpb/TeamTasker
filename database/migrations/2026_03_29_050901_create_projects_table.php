@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('projects', function (Blueprint $table) {
             $table->id();
+            $table->uuid('uuid')->unique();
             $table->foreignId('team_id')->index();
             $table->string('name');
             $table->timestamp('archived_at')->nullable()->index();

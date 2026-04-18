@@ -56,11 +56,11 @@ class DashboardService
             'priority' => $task->priority->value,
             'is_completed' => $task->isCompleted(),
             'project' => [
-                'id' => $project->id,
+                'id' => $project->uuid,
                 'name' => $project->name,
             ],
             'team' => [
-                'id' => $team->id,
+                'id' => $team->uuid,
                 'name' => $team->name,
             ],
             'column' => [
@@ -84,10 +84,10 @@ class DashboardService
         $team = $project->team;
 
         return [
-            'id' => $project->id,
+            'id' => $project->uuid,
             'name' => $project->name,
             'team' => [
-                'id' => $team->id,
+                'id' => $team->uuid,
                 'name' => $team->name,
             ],
         ];
@@ -110,11 +110,11 @@ class DashboardService
                 'name' => $log->actor->name,
             ] : null,
             'project' => [
-                'id' => $project->id,
+                'id' => $project->uuid,
                 'name' => $project->name,
             ],
             'team' => [
-                'id' => $team->id,
+                'id' => $team->uuid,
                 'name' => $team->name,
             ],
         ];

@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('team_members', function (Blueprint $table) {
             $table->id();
+            $table->uuid('uuid')->unique();
             $table->foreignId('team_id')->index();
             $table->foreignId('user_id')->index();
             $table->string('role')->default('member');

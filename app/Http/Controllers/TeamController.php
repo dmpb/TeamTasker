@@ -32,7 +32,10 @@ class TeamController extends Controller
         $teams = $this->teamService->getUserTeams($user);
 
         return Inertia::render('teams/index', [
-            'teams' => $teams,
+            'teams' => $teams->map(static fn (Team $team): array => [
+                'id' => $team->uuid,
+                'name' => $team->name,
+            ])->values()->all(),
         ]);
     }
 
@@ -63,7 +66,7 @@ class TeamController extends Controller
                 ->listOpenInvitationsForTeam($team)
                 ->map(static function (TeamInvitation $invitation): array {
                     return [
-                        'id' => $invitation->id,
+                        'id' => $invitation->uuid,
                         'email' => $invitation->email,
                         'role' => $invitation->role,
                         'expires_at' => $invitation->expires_at->toIso8601String(),
@@ -75,12 +78,16 @@ class TeamController extends Controller
         }
 
         return Inertia::render('teams/show', [
-            'team' => $team->only(['id', 'name', 'owner_id']),
+            'team' => [
+                'id' => $team->uuid,
+                'name' => $team->name,
+                'owner_id' => $team->owner_id,
+            ],
             'members' => $team->members->map(function ($member) use ($canManageMembers, $team): array {
                 $memberUserId = $member->user->id;
 
                 return [
-                    'id' => $member->id,
+                    'id' => $member->uuid,
                     'role' => $member->role->value,
                     'user' => [
                         'id' => $memberUserId,

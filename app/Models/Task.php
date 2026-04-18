@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\TaskPriority;
+use App\Models\Concerns\HasPublicUuid;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -26,6 +27,7 @@ class Task extends Model
 {
     /** @use HasFactory<TaskFactory> */
     use HasFactory;
+    use HasPublicUuid;
 
     /**
      * @return array<string, string>

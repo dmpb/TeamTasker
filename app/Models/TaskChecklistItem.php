@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUuid;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['task_id', 'title', 'position', 'is_completed', 'created_by'])]
 class TaskChecklistItem extends Model
 {
+    use HasPublicUuid;
+
     /**
      * @return array<string, string>
      */

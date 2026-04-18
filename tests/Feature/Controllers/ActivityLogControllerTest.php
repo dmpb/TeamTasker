@@ -55,7 +55,7 @@ it('shows project activity logs for team members', function () {
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->component('teams/projects/activity/index')
-            ->where('project.id', $project->id)
+            ->where('project.id', $project->uuid)
             ->has('activityLogs', 1)
             ->where('activityLogs.0.event', 'task.created')
             ->where('activityLogs.0.actor.id', $owner->id)

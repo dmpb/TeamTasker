@@ -44,9 +44,13 @@ class TaskShowController extends Controller
             ->get(['id', 'title', 'completed_at']);
 
         return Inertia::render('teams/projects/tasks/show', [
-            'team' => $team->only(['id', 'name', 'owner_id']),
+            'team' => [
+                'id' => $team->uuid,
+                'name' => $team->name,
+                'owner_id' => $team->owner_id,
+            ],
             'project' => [
-                'id' => $project->id,
+                'id' => $project->uuid,
                 'name' => $project->name,
                 'archived_at' => $project->archived_at?->toIso8601String(),
             ],

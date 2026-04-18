@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('team_invitations', function (Blueprint $table) {
             $table->id();
+            $table->uuid('uuid')->unique();
             $table->foreignId('team_id')->constrained()->cascadeOnDelete();
             $table->string('email');
             $table->string('role')->default('member');

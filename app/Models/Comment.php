@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUuid;
 use Database\Factories\CommentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,6 +14,7 @@ class Comment extends Model
 {
     /** @use HasFactory<CommentFactory> */
     use HasFactory;
+    use HasPublicUuid;
 
     public function task(): BelongsTo
     {

@@ -44,11 +44,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::scopeBindings()->group(function () {
         Route::bind('member', static function (string $value, RoutingRoute $route): TeamMember {
-            $teamId = (int) $route->parameter('team');
+            $team = $route->parameter('team');
+            $teamId = $team instanceof \App\Models\Team
+                ? $team->id
+                : \App\Models\Team::query()->where('uuid', $team)->value('id');
 
             /** @var TeamMember $member */
             $member = TeamMember::query()
-                ->whereKey((int) $value)
+                ->where('uuid', $value)
                 ->where('team_id', $teamId)
                 ->firstOrFail();
 

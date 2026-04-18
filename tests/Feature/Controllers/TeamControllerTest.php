@@ -40,8 +40,8 @@ it('renders the teams page with authenticated user teams', function () {
                 ->where('teams', function ($teams) use ($ownedTeam, $memberTeam, $excludedTeam) {
                     $ids = collect($teams)->pluck('id')->all();
 
-                    expect($ids)->toContain($ownedTeam->id, $memberTeam->id)
-                        ->not->toContain($excludedTeam->id);
+                    expect($ids)->toContain($ownedTeam->uuid, $memberTeam->uuid)
+                        ->not->toContain($excludedTeam->uuid);
 
                     return true;
                 });

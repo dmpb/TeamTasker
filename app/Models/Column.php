@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUuid;
 use Database\Factories\ColumnFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,6 +15,7 @@ class Column extends Model
 {
     /** @use HasFactory<ColumnFactory> */
     use HasFactory;
+    use HasPublicUuid;
 
     /**
      * @var string

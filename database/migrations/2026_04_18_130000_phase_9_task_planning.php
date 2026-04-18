@@ -19,6 +19,7 @@ return new class extends Migration
 
         Schema::create('labels', function (Blueprint $table) {
             $table->id();
+            $table->uuid('uuid')->unique();
             $table->foreignId('project_id')->constrained()->cascadeOnDelete();
             $table->string('name');
             $table->string('color', 32)->nullable();
@@ -36,6 +37,7 @@ return new class extends Migration
 
         Schema::create('task_checklist_items', function (Blueprint $table) {
             $table->id();
+            $table->uuid('uuid')->unique();
             $table->foreignId('task_id')->constrained()->cascadeOnDelete();
             $table->string('title');
             $table->unsignedInteger('position')->default(0);
@@ -48,6 +50,7 @@ return new class extends Migration
 
         Schema::create('task_dependencies', function (Blueprint $table) {
             $table->id();
+            $table->uuid('uuid')->unique();
             $table->foreignId('dependent_task_id')->constrained('tasks')->cascadeOnDelete();
             $table->foreignId('prerequisite_task_id')->constrained('tasks')->cascadeOnDelete();
             $table->timestamps();

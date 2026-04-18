@@ -24,7 +24,7 @@ class CommentController extends Controller
     {
         $this->authorize('view', $task);
         /** @var User $user */
-        $user = auth()->user();
+        $user = $request->user();
         $canManageProject = $user->can('update', $project);
 
         /** @var array{ q?: string|null } $validated */
@@ -35,11 +35,11 @@ class CommentController extends Controller
 
         return Inertia::render('teams/projects/tasks/comments', [
             'team' => [
-                'id' => $team->id,
+                'id' => $team->uuid,
                 'name' => $team->name,
             ],
             'project' => [
-                'id' => $project->id,
+                'id' => $project->uuid,
                 'name' => $project->name,
             ],
             'task' => [

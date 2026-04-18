@@ -69,7 +69,7 @@ class HandleInertiaRequests extends Middleware
                     ->getUserTeams($request->user())
                     ->take(8)
                     ->map(static fn ($team): array => [
-                        'id' => $team->id,
+                        'id' => $team->uuid,
                         'name' => $team->name,
                     ])
                     ->values()

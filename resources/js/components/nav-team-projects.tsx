@@ -12,7 +12,7 @@ import { useCurrentUrl } from '@/hooks/use-current-url';
 import { index as teamProjectsIndex } from '@/routes/teams/projects';
 
 type TeamNavEntry = {
-    id: number;
+    id: string;
     name: string;
 };
 

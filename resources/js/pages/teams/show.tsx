@@ -18,7 +18,7 @@ import { index as teamProjectsIndex } from '@/routes/teams/projects';
 import type { BreadcrumbItem } from '@/types';
 
 type MemberRow = {
-    id: number;
+    id: string;
     role: string;
     user: {
         id: number;
@@ -30,7 +30,7 @@ type MemberRow = {
 };
 
 type InvitationRow = {
-    id: number;
+    id: string;
     email: string;
     role: string;
     expires_at: string;
@@ -47,7 +47,7 @@ type MemberSuggestion = {
 
 type TeamShowProps = {
     team: {
-        id: number;
+        id: string;
         name: string;
         owner_id: number;
     };
@@ -75,7 +75,7 @@ export default function TeamShow() {
     const [memberPendingRemove, setMemberPendingRemove] = useState<MemberRow | null>(null);
     const [invitationPendingCancel, setInvitationPendingCancel] = useState<InvitationRow | null>(null);
     const [userSearchDraft, setUserSearchDraft] = useState('');
-    const [copiedInvitationId, setCopiedInvitationId] = useState<number | null>(null);
+    const [copiedInvitationId, setCopiedInvitationId] = useState<string | null>(null);
 
     const breadcrumbs: BreadcrumbItem[] = [
         {

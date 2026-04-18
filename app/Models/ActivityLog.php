@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicUuid;
 use Database\Factories\ActivityLogFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,6 +15,7 @@ class ActivityLog extends Model
 {
     /** @use HasFactory<ActivityLogFactory> */
     use HasFactory;
+    use HasPublicUuid;
 
     /**
      * @return array<string, string>

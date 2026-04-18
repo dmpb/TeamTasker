@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('teams', function (Blueprint $table) {
             $table->id();
+            $table->uuid('uuid')->unique();
             $table->string('name');
             $table->foreignId('owner_id')->index();
             $table->foreign('owner_id')->references('id')->on('users')->cascadeOnDelete();

@@ -55,11 +55,11 @@ class ActivityLogController extends Controller
 
         return Inertia::render('teams/projects/activity/index', [
             'team' => [
-                'id' => $team->id,
+                'id' => $team->uuid,
                 'name' => $team->name,
             ],
             'project' => [
-                'id' => $project->id,
+                'id' => $project->uuid,
                 'name' => $project->name,
             ],
             'activityLogs' => $logs->map(static fn (ActivityLog $log): array => [
