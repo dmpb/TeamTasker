@@ -208,9 +208,10 @@ it('shows a team to members and owners with inertia', function () {
             ->component('teams/show')
             ->where('team.name', 'Visible Team')
             ->where('team.description', 'Equipo visible para pruebas')
+            ->where('team.projects_count', 0)
+            ->where('team.members_count', 1)
             ->where('can.manageMembers', true)
-            ->has('invitations')
-            ->has('memberSuggestions'));
+            ->has('invitations'));
 
     $this->actingAs($member)
         ->get(route('teams.show', $team))
@@ -219,26 +220,7 @@ it('shows a team to members and owners with inertia', function () {
             ->component('teams/show')
             ->where('can.manageMembers', false)
             ->has('invitations', 0)
-            ->has('memberSuggestions', 0));
-});
-
-it('returns member suggestions for managers when user_q is set', function () {
-    $owner = User::factory()->create();
-    $outsider = User::factory()->create([
-        'name' => 'UniqueSearchNameXyz',
-        'email' => 'unique-search-xyz@example.com',
-    ]);
-    $team = Team::factory()->forOwner($owner)->create();
-
-    $url = route('teams.show', $team).'?'.http_build_query(['user_q' => 'UniqueSearch']);
-
-    /** @var TestCase $this */
-    $this->actingAs($owner)
-        ->get($url)
-        ->assertOk()
-        ->assertInertia(fn ($page) => $page
-            ->has('memberSuggestions', 1)
-            ->where('memberSuggestions.0.email', $outsider->email));
+            ->where('team.members_count', 1));
 });
 
 it('forbids plain members from managing team membership via http', function () {

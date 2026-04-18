@@ -58,20 +58,11 @@ class TeamController extends Controller
         $this->authorize('view', $team);
 
         $team->load(['members.user']);
+        $team->loadCount('projects');
 
         /** @var User $user */
         $user = $request->user();
         $canManageMembers = $user->can('manageMembers', $team);
-
-        $memberSuggestions = [];
-
-        if ($canManageMembers) {
-            $memberSearchQuery = trim((string) $request->query('user_q', ''));
-
-            if (strlen($memberSearchQuery) >= 2) {
-                $memberSuggestions = $this->teamService->searchUsersNotInTeam($team, $memberSearchQuery, 12);
-            }
-        }
 
         $invitations = [];
 
@@ -97,6 +88,8 @@ class TeamController extends Controller
                 'name' => $team->name,
                 'description' => $team->description,
                 'owner_id' => $team->owner_id,
+                'projects_count' => (int) $team->projects_count,
+                'members_count' => $team->members->count(),
             ],
             'members' => $team->members->map(function ($member) use ($canManageMembers, $team): array {
                 $memberUserId = $member->user->id;
@@ -117,7 +110,6 @@ class TeamController extends Controller
                 'manageMembers' => $canManageMembers,
             ],
             'invitations' => $invitations,
-            'memberSuggestions' => $memberSuggestions,
         ]);
     }
 

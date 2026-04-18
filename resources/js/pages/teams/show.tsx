@@ -1,14 +1,36 @@
 import { Form, Head, Link, router, usePage } from '@inertiajs/react';
+import { Copy, Mail, Trash2, UserCog } from 'lucide-react';
 import { useState } from 'react';
 import TeamInvitationController from '@/actions/App/Http/Controllers/TeamInvitationController';
 import { ConfirmDestructiveDialog } from '@/components/confirm-destructive-dialog';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/app-layout';
+import { cn } from '@/lib/utils';
 import { index as teamsIndex, show as teamsShow } from '@/routes/teams';
 import {
     destroy as destroyTeamMember,
@@ -39,22 +61,17 @@ type InvitationRow = {
     accept_url: string;
 };
 
-type MemberSuggestion = {
-    id: number;
-    name: string;
-    email: string;
-};
-
 type TeamShowProps = {
     team: {
         id: string;
         name: string;
         description: string | null;
         owner_id: number;
+        projects_count: number;
+        members_count: number;
     };
     members: MemberRow[];
     invitations: InvitationRow[];
-    memberSuggestions: MemberSuggestion[];
     can: {
         manageMembers: boolean;
     };
@@ -68,15 +85,42 @@ type PageErrors = {
     invitation?: string;
 };
 
+const selectClass = cn(
+    'border-input bg-background flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs transition-[color,box-shadow] outline-none',
+    'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
+    'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50',
+);
+
+function initialsFromName(name: string): string {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+
+    if (parts.length === 0) {
+        return '?';
+    }
+
+    if (parts.length === 1) {
+        return parts[0].slice(0, 2).toUpperCase();
+    }
+
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
 export default function TeamShow() {
     const page = usePage<TeamShowProps & { errors: PageErrors }>();
-    const { team, members, can, invitations, memberSuggestions } = page.props;
+    const { team, members, can, invitations } = page.props;
     const { errors } = page.props;
 
-    const [memberPendingRemove, setMemberPendingRemove] = useState<MemberRow | null>(null);
-    const [invitationPendingCancel, setInvitationPendingCancel] = useState<InvitationRow | null>(null);
-    const [userSearchDraft, setUserSearchDraft] = useState('');
-    const [copiedInvitationId, setCopiedInvitationId] = useState<string | null>(null);
+    const [memberPendingRemove, setMemberPendingRemove] =
+        useState<MemberRow | null>(null);
+    const [invitationPendingCancel, setInvitationPendingCancel] =
+        useState<InvitationRow | null>(null);
+    const [copiedInvitationId, setCopiedInvitationId] = useState<string | null>(
+        null,
+    );
+    const [inviteOpen, setInviteOpen] = useState(false);
+    const [roleEditMember, setRoleEditMember] = useState<MemberRow | null>(
+        null,
+    );
 
     const breadcrumbs: BreadcrumbItem[] = [
         {
@@ -89,40 +133,10 @@ export default function TeamShow() {
         },
     ];
 
-    const runMemberSuggestionSearch = (): void => {
-        const q = userSearchDraft.trim();
-
-        if (q.length < 2) {
-            return;
-        }
-
-        router.get(
-            teamsShow.url({ team: team.id }, { query: { user_q: q } }),
-            {},
-            {
-                only: ['memberSuggestions'],
-                preserveState: true,
-                preserveScroll: true,
-                replace: true,
-            },
-        );
-    };
-
     const copyInvitationLink = async (row: InvitationRow): Promise<void> => {
         await navigator.clipboard.writeText(row.accept_url);
         setCopiedInvitationId(row.id);
         window.setTimeout(() => setCopiedInvitationId(null), 2000);
-    };
-
-    const fillInviteEmail = (email: string): void => {
-        const el = document.getElementById(
-            'invite-email',
-        ) as HTMLInputElement | null;
-
-        if (el) {
-            el.value = email;
-            el.focus();
-        }
     };
 
     return (
@@ -130,377 +144,498 @@ export default function TeamShow() {
             <Head title={team.name} />
 
             <div className="space-y-8 p-4">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <Heading
-                        variant="small"
-                        title={team.name}
-                        description={
-                            team.description?.trim()
-                                ? team.description
-                                : 'Miembros, invitaciones y acceso para este team.'
-                        }
-                    />
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                        <Link
-                            href={teamProjectsIndex(team.id)}
-                            prefetch
-                            className="text-sm font-medium text-muted-foreground underline-offset-4 hover:underline"
-                        >
-                            Proyectos
-                        </Link>
-                        <Link
-                            href={teamsIndex()}
-                            prefetch
-                            className="text-sm text-muted-foreground underline-offset-4 hover:underline"
-                        >
-                            Volver a Teams
-                        </Link>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 space-y-2">
+                        <Heading
+                            variant="small"
+                            title={team.name}
+                            description={
+                                team.description?.trim()
+                                    ? team.description
+                                    : 'Miembros, invitaciones y acceso para este team.'
+                            }
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            {team.projects_count}{' '}
+                            {team.projects_count === 1
+                                ? 'proyecto'
+                                : 'proyectos'}
+                            <span aria-hidden> · </span>
+                            {team.members_count}{' '}
+                            {team.members_count === 1
+                                ? 'miembro'
+                                : 'miembros'}
+                            {can.manageMembers && invitations.length > 0 ? (
+                                <>
+                                    <span aria-hidden> · </span>
+                                    {invitations.length}{' '}
+                                    {invitations.length === 1
+                                        ? 'invitación pendiente'
+                                        : 'invitaciones pendientes'}
+                                </>
+                            ) : null}
+                        </p>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap items-center gap-2">
+                        {can.manageMembers ? (
+                            <Button
+                                type="button"
+                                onClick={() => setInviteOpen(true)}
+                            >
+                                Invitar por correo
+                            </Button>
+                        ) : null}
+                        <Button variant="outline" asChild>
+                            <Link
+                                href={teamProjectsIndex(team.id)}
+                                prefetch
+                            >
+                                Proyectos
+                            </Link>
+                        </Button>
                     </div>
                 </div>
 
-                {can.manageMembers && (
-                    <section className="max-w-2xl space-y-6">
-                        <div className="space-y-4 rounded-md border border-sidebar-border/70 p-4 dark:border-sidebar-border">
-                            <h2 className="text-sm font-medium text-muted-foreground">
-                                Invite by email
-                            </h2>
-                            <p className="text-xs text-muted-foreground">
-                                We will email a link (when mail is configured) and you
-                                can always copy the link from the list below.
-                            </p>
-                            <Form
-                                {...TeamInvitationController.store.form({
-                                    team: team.id,
-                                })}
-                                options={{
-                                    preserveScroll: true,
-                                }}
-                                resetOnSuccess={['email']}
-                                className="space-y-4"
-                            >
-                                {({ processing, errors: formErrors }) => (
-                                    <>
-                                        <div className="grid gap-2 sm:max-w-md">
-                                            <Label htmlFor="invite-email">Email</Label>
-                                            <Input
-                                                id="invite-email"
-                                                name="email"
-                                                type="email"
-                                                required
-                                                autoComplete="email"
-                                                placeholder="colleague@example.com"
-                                            />
-                                            <InputError
-                                                className="mt-1"
-                                                message={
-                                                    formErrors.email ?? errors.email
-                                                }
-                                            />
-                                        </div>
-                                        <div className="grid max-w-xs gap-2">
-                                            <Label htmlFor="invite-role">Role</Label>
-                                            <select
-                                                id="invite-role"
-                                                name="role"
-                                                required
-                                                defaultValue="member"
-                                                className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-[3px] focus-visible:outline-none"
-                                            >
-                                                <option value="member">Member</option>
-                                                <option value="admin">Admin</option>
-                                            </select>
-                                        </div>
+                <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>Invitar por correo</DialogTitle>
+                            <DialogDescription>
+                                Enviaremos un enlace de invitación al correo
+                                indicado (si el correo está configurado).
+                                También puedes copiar el enlace desde la lista
+                                de invitaciones pendientes.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <Form
+                            {...TeamInvitationController.store.form({
+                                team: team.id,
+                            })}
+                            options={{
+                                preserveScroll: true,
+                            }}
+                            resetOnSuccess={['email']}
+                            onSuccess={() => setInviteOpen(false)}
+                            className="space-y-4"
+                        >
+                            {({ processing, errors: formErrors }) => (
+                                <>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="invite-email">
+                                            Correo
+                                        </Label>
+                                        <Input
+                                            id="invite-email"
+                                            name="email"
+                                            type="email"
+                                            required
+                                            autoComplete="email"
+                                            placeholder="compañero@ejemplo.com"
+                                        />
+                                        <InputError
+                                            className="mt-1"
+                                            message={
+                                                formErrors.email ??
+                                                errors.email
+                                            }
+                                        />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="invite-role">
+                                            Rol
+                                        </Label>
+                                        <select
+                                            id="invite-role"
+                                            name="role"
+                                            required
+                                            defaultValue="member"
+                                            className={selectClass}
+                                        >
+                                            <option value="member">
+                                                Miembro
+                                            </option>
+                                            <option value="admin">
+                                                Admin
+                                            </option>
+                                        </select>
+                                    </div>
+                                    <DialogFooter>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() =>
+                                                setInviteOpen(false)
+                                            }
+                                        >
+                                            Cancelar
+                                        </Button>
                                         <Button
                                             type="submit"
                                             disabled={processing}
                                             data-test="send-team-invitation"
                                         >
                                             {processing && <Spinner />}
-                                            Send invitation
+                                            Enviar invitación
                                         </Button>
+                                    </DialogFooter>
+                                </>
+                            )}
+                        </Form>
+                    </DialogContent>
+                </Dialog>
+
+                <Dialog
+                    open={roleEditMember !== null}
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            setRoleEditMember(null);
+                        }
+                    }}
+                >
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>Cambiar rol</DialogTitle>
+                            <DialogDescription>
+                                {roleEditMember
+                                    ? `${roleEditMember.user.name} · ${roleEditMember.user.email}`
+                                    : ''}
+                            </DialogDescription>
+                        </DialogHeader>
+                        {roleEditMember ? (
+                            <Form
+                                key={roleEditMember.id}
+                                {...updateTeamMember.form({
+                                    team: team.id,
+                                    member: roleEditMember.id,
+                                })}
+                                options={{
+                                    preserveScroll: true,
+                                }}
+                                onSuccess={() => setRoleEditMember(null)}
+                                className="space-y-4"
+                            >
+                                {({ processing, errors: fe }) => (
+                                    <>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="edit-member-role">
+                                                Rol
+                                            </Label>
+                                            <select
+                                                id="edit-member-role"
+                                                name="role"
+                                                required
+                                                defaultValue={
+                                                    roleEditMember.role
+                                                }
+                                                className={selectClass}
+                                            >
+                                                <option value="member">
+                                                    Miembro
+                                                </option>
+                                                <option value="admin">
+                                                    Admin
+                                                </option>
+                                            </select>
+                                            <InputError
+                                                message={
+                                                    fe.role ?? errors.role
+                                                }
+                                            />
+                                        </div>
+                                        <DialogFooter>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                onClick={() =>
+                                                    setRoleEditMember(null)
+                                                }
+                                            >
+                                                Cancelar
+                                            </Button>
+                                            <Button
+                                                type="submit"
+                                                disabled={processing}
+                                                data-test={`update-member-role-${roleEditMember.user.id}`}
+                                            >
+                                                {processing && <Spinner />}
+                                                Guardar rol
+                                            </Button>
+                                        </DialogFooter>
                                     </>
                                 )}
                             </Form>
-                        </div>
+                        ) : null}
+                    </DialogContent>
+                </Dialog>
 
-                        <div className="space-y-4 rounded-md border border-sidebar-border/70 p-4 dark:border-sidebar-border">
-                            <h2 className="text-sm font-medium text-muted-foreground">
-                                Find registered users
-                            </h2>
-                            <p className="text-xs text-muted-foreground">
-                                Search by name or email. Pick a row to copy their email
-                                into the invite form.
-                            </p>
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                                <div className="grid max-w-md flex-1 gap-2">
-                                    <Label htmlFor="member-user-search">Search</Label>
-                                    <Input
-                                        id="member-user-search"
-                                        value={userSearchDraft}
-                                        onChange={(e) =>
-                                            setUserSearchDraft(e.target.value)
-                                        }
-                                        placeholder="At least 2 characters…"
-                                        maxLength={255}
-                                    />
-                                </div>
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    onClick={runMemberSuggestionSearch}
-                                >
-                                    Search
-                                </Button>
-                            </div>
-                            {memberSuggestions.length > 0 && (
-                                <ul className="divide-y rounded-md border border-border text-sm">
-                                    {memberSuggestions.map((u) => (
-                                        <li
-                                            key={u.id}
-                                            className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
-                                        >
-                                            <div>
-                                                <p className="font-medium">{u.name}</p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    {u.email}
-                                                </p>
-                                            </div>
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => fillInviteEmail(u.email)}
-                                            >
-                                                Use email
-                                            </Button>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
-
-                        <div className="space-y-3">
-                            <h2 className="text-sm font-medium text-muted-foreground">
-                                Pending invitations
-                            </h2>
-                            {errors.invitation && (
-                                <p
-                                    className="text-sm text-destructive"
-                                    role="alert"
-                                >
-                                    {errors.invitation}
-                                </p>
-                            )}
-                            {invitations.length === 0 ? (
+                {can.manageMembers ? (
+                    <section className="space-y-3">
+                        <Card className="py-0">
+                            <CardHeader className="pb-0 pt-6">
+                                <CardTitle className="text-base font-medium">
+                                    Invitaciones pendientes
+                                </CardTitle>
                                 <p className="text-sm text-muted-foreground">
-                                    No open invitations.
+                                    Invitaciones abiertas para unirse a este
+                                    team.
                                 </p>
-                            ) : (
-                                <ul className="divide-y rounded-md border border-sidebar-border/70 dark:border-sidebar-border">
-                                    {invitations.map((row) => (
-                                        <li
-                                            key={row.id}
-                                            className="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-start sm:justify-between"
-                                        >
-                                            <div className="min-w-0 flex-1 space-y-1">
-                                                <p className="text-sm font-medium">
-                                                    {row.email}
-                                                </p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    Role {row.role} · Invited by{' '}
-                                                    {row.invited_by_name}
-                                                </p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    Expires{' '}
-                                                    {new Date(
-                                                        row.expires_at,
-                                                    ).toLocaleString()}
-                                                </p>
-                                                {row.is_expired && (
-                                                    <span className="inline-block rounded border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-800 dark:text-amber-200">
-                                                        Expired — resend to refresh
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="flex flex-wrap gap-2">
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant="secondary"
-                                                    onClick={() =>
-                                                        copyInvitationLink(row)
-                                                    }
-                                                >
-                                                    {copiedInvitationId === row.id
-                                                        ? 'Copied'
-                                                        : 'Copy link'}
-                                                </Button>
-                                                <Form
-                                                    {...TeamInvitationController.resend.form(
-                                                        {
-                                                            team: team.id,
-                                                            invitation: row.id,
-                                                        },
-                                                    )}
-                                                    options={{
-                                                        preserveScroll: true,
-                                                    }}
-                                                >
-                                                    {({ processing }) => (
-                                                        <Button
-                                                            type="submit"
-                                                            size="sm"
+                            </CardHeader>
+                            <CardContent className="pb-6 pt-4">
+                                {errors.invitation ? (
+                                    <p
+                                        className="mb-4 text-sm text-destructive"
+                                        role="alert"
+                                    >
+                                        {errors.invitation}
+                                    </p>
+                                ) : null}
+                                {invitations.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">
+                                        No hay invitaciones abiertas.
+                                    </p>
+                                ) : (
+                                    <ul className="divide-y rounded-md border border-sidebar-border/70 dark:border-sidebar-border">
+                                        {invitations.map((row) => (
+                                            <li
+                                                key={row.id}
+                                                className="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+                                            >
+                                                <div className="min-w-0 flex-1 space-y-1">
+                                                    <p className="text-sm font-medium">
+                                                        {row.email}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Rol {row.role} ·
+                                                        Invitado por{' '}
+                                                        {row.invited_by_name}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Caduca{' '}
+                                                        {new Date(
+                                                            row.expires_at,
+                                                        ).toLocaleString()}
+                                                    </p>
+                                                    {row.is_expired ? (
+                                                        <Badge
                                                             variant="outline"
-                                                            disabled={processing}
-                                                            data-test={`resend-invitation-${row.id}`}
+                                                            className="border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200"
                                                         >
-                                                            {processing && <Spinner />}
-                                                            Resend email
-                                                        </Button>
-                                                    )}
-                                                </Form>
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant="destructive"
-                                                    onClick={() =>
-                                                        setInvitationPendingCancel(row)
-                                                    }
-                                                    data-test={`cancel-invitation-${row.id}`}
-                                                >
-                                                    Cancel
-                                                </Button>
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </div>
+                                                            Caducada — reenvía
+                                                            para renovar
+                                                        </Badge>
+                                                    ) : null}
+                                                </div>
+                                                <div className="flex flex-wrap items-center gap-1 sm:justify-end">
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Button
+                                                                type="button"
+                                                                size="icon"
+                                                                variant="secondary"
+                                                                className="size-9 shrink-0"
+                                                                onClick={() =>
+                                                                    copyInvitationLink(
+                                                                        row,
+                                                                    )
+                                                                }
+                                                                aria-label="Copiar enlace de invitación"
+                                                            >
+                                                                <Copy
+                                                                    className="size-4"
+                                                                    aria-hidden
+                                                                />
+                                                            </Button>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            {copiedInvitationId ===
+                                                            row.id
+                                                                ? 'Copiado'
+                                                                : 'Copiar enlace'}
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                    <Form
+                                                        {...TeamInvitationController.resend.form(
+                                                            {
+                                                                team: team.id,
+                                                                invitation:
+                                                                    row.id,
+                                                            },
+                                                        )}
+                                                        options={{
+                                                            preserveScroll: true,
+                                                        }}
+                                                    >
+                                                        {({ processing }) => (
+                                                            <Tooltip>
+                                                                <TooltipTrigger
+                                                                    asChild
+                                                                >
+                                                                    <Button
+                                                                        type="submit"
+                                                                        size="icon"
+                                                                        variant="outline"
+                                                                        className="size-9 shrink-0"
+                                                                        disabled={
+                                                                            processing
+                                                                        }
+                                                                        data-test={`resend-invitation-${row.id}`}
+                                                                        aria-label="Reenviar correo de invitación"
+                                                                    >
+                                                                        {processing ? (
+                                                                            <Spinner />
+                                                                        ) : (
+                                                                            <Mail
+                                                                                className="size-4"
+                                                                                aria-hidden
+                                                                            />
+                                                                        )}
+                                                                    </Button>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>
+                                                                    Reenviar
+                                                                    correo
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        )}
+                                                    </Form>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Button
+                                                                type="button"
+                                                                size="icon"
+                                                                variant="destructive"
+                                                                className="size-9 shrink-0"
+                                                                onClick={() =>
+                                                                    setInvitationPendingCancel(
+                                                                        row,
+                                                                    )
+                                                                }
+                                                                data-test={`cancel-invitation-${row.id}`}
+                                                                aria-label="Cancelar invitación"
+                                                            >
+                                                                <Trash2
+                                                                    className="size-4"
+                                                                    aria-hidden
+                                                                />
+                                                            </Button>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            Cancelar invitación
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </div>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </CardContent>
+                        </Card>
                     </section>
-                )}
+                ) : null}
 
-                <section className="space-y-2">
+                <section className="space-y-3">
                     <h2 className="text-sm font-medium text-muted-foreground">
-                        Members
+                        Miembros
                     </h2>
-                    {(errors.user || errors.role) && can.manageMembers && (
+                    {(errors.user || errors.role) && can.manageMembers ? (
                         <div
                             className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive"
                             role="alert"
                         >
-                            {errors.user && <p>{errors.user}</p>}
-                            {errors.role && <p>{errors.role}</p>}
+                            {errors.user ? <p>{errors.user}</p> : null}
+                            {errors.role && !roleEditMember ? (
+                                <p>{errors.role}</p>
+                            ) : null}
                         </div>
-                    )}
-                    <ul className="divide-y rounded-md border border-sidebar-border/70 dark:border-sidebar-border">
-                        {members.length === 0 ? (
-                            <li className="px-3 py-6 text-sm text-muted-foreground">
-                                No members yet.
-                            </li>
-                        ) : (
-                            members.map((row) => (
-                                <li
-                                    key={row.id}
-                                    className="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-start sm:justify-between"
-                                >
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-sm font-medium">
-                                            {row.user.name}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {row.user.email}
-                                        </p>
-                                        <div className="mt-1 flex flex-wrap items-center gap-2">
-                                            <span className="rounded-md border border-sidebar-border/70 px-2 py-0.5 text-xs font-medium capitalize dark:border-sidebar-border">
-                                                {row.role}
-                                            </span>
-                                            {row.user.id === team.owner_id && (
-                                                <span className="text-xs text-muted-foreground">
-                                                    Team owner
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    {(row.can_update_role || row.can_remove) && (
-                                        <div className="flex flex-col gap-3 sm:min-w-[220px] sm:items-end">
-                                            {row.can_update_role && (
-                                                <Form
-                                                    {...updateTeamMember.form({
-                                                        team: team.id,
-                                                        member: row.id,
-                                                    })}
-                                                    options={{
-                                                        preserveScroll: true,
-                                                    }}
-                                                    className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-end"
-                                                >
-                                                    {({
-                                                        processing,
-                                                        errors: fe,
-                                                    }) => (
-                                                        <>
-                                                            <div className="grid w-full gap-1 sm:w-40">
-                                                                <Label
-                                                                    className="sr-only"
-                                                                    htmlFor={`role-${row.id}`}
-                                                                >
-                                                                    Role
-                                                                </Label>
-                                                                <select
-                                                                    id={`role-${row.id}`}
-                                                                    name="role"
-                                                                    required
-                                                                    defaultValue={
-                                                                        row.role
-                                                                    }
-                                                                    className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-2 py-1 text-sm shadow-xs focus-visible:ring-[3px] focus-visible:outline-none disabled:opacity-50"
-                                                                >
-                                                                    <option value="member">
-                                                                        Member
-                                                                    </option>
-                                                                    <option value="admin">
-                                                                        Admin
-                                                                    </option>
-                                                                </select>
-                                                                <InputError
-                                                                    message={fe.role}
-                                                                />
-                                                            </div>
-                                                            <Button
-                                                                type="submit"
-                                                                size="sm"
-                                                                variant="secondary"
-                                                                disabled={processing}
-                                                                data-test={`update-member-role-${row.user.id}`}
-                                                            >
-                                                                {processing && (
-                                                                    <Spinner />
-                                                                )}
-                                                                Save role
-                                                            </Button>
-                                                        </>
-                                                    )}
-                                                </Form>
-                                            )}
-                                            {row.can_remove && (
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    variant="destructive"
-                                                    data-test={`remove-member-${row.user.id}`}
-                                                    onClick={() =>
-                                                        setMemberPendingRemove(row)
-                                                    }
-                                                >
-                                                    Remove
-                                                </Button>
-                                            )}
-                                        </div>
-                                    )}
+                    ) : null}
+                    {members.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-sidebar-border/70 py-12 text-center dark:border-sidebar-border">
+                            <p className="text-sm text-muted-foreground">
+                                Aún no hay miembros en este team.
+                            </p>
+                        </div>
+                    ) : (
+                        <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                            {members.map((row) => (
+                                <li key={row.id}>
+                                    <Card className="h-full py-0 gap-0">
+                                        <CardHeader className="flex flex-row items-start gap-3 space-y-0 pt-6 pb-6">
+                                            <div
+                                                className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary"
+                                                aria-hidden
+                                            >
+                                                {initialsFromName(
+                                                    row.user.name,
+                                                )}
+                                            </div>
+                                            <div className="min-w-0 flex-1 space-y-1">
+                                                <CardTitle className="text-base leading-snug">
+                                                    {row.user.name}
+                                                </CardTitle>
+                                                <p className="break-all text-sm text-muted-foreground">
+                                                    {row.user.email}
+                                                </p>
+                                                <div className="flex flex-wrap items-center gap-2 pt-1">
+                                                    <Badge
+                                                        variant="secondary"
+                                                        className="capitalize"
+                                                    >
+                                                        {row.role === 'member'
+                                                            ? 'Miembro'
+                                                            : row.role ===
+                                                                'admin'
+                                                              ? 'Admin'
+                                                              : row.role ===
+                                                                  'owner'
+                                                                ? 'Propietario'
+                                                                : row.role}
+                                                    </Badge>
+                                                </div>
+                                            </div>
+                                        </CardHeader>
+                                        {row.can_update_role ||
+                                        row.can_remove ? (
+                                            <CardContent className="flex flex-wrap gap-2 pb-6">
+                                                {row.can_update_role ? (
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            setRoleEditMember(
+                                                                row,
+                                                            )
+                                                        }
+                                                    >
+                                                        <UserCog
+                                                            className="mr-1.5 size-4"
+                                                            aria-hidden
+                                                        />
+                                                        Cambiar rol
+                                                    </Button>
+                                                ) : null}
+                                                {row.can_remove ? (
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        variant="destructive"
+                                                        data-test={`remove-member-${row.user.id}`}
+                                                        onClick={() =>
+                                                            setMemberPendingRemove(
+                                                                row,
+                                                            )
+                                                        }
+                                                    >
+                                                        Quitar
+                                                    </Button>
+                                                ) : null}
+                                            </CardContent>
+                                        ) : null}
+                                    </Card>
                                 </li>
-                            ))
-                        )}
-                    </ul>
+                            ))}
+                        </ul>
+                    )}
                 </section>
             </div>
 
@@ -511,13 +646,13 @@ export default function TeamShow() {
                         setMemberPendingRemove(null);
                     }
                 }}
-                title="Remove member"
+                title="Quitar miembro"
                 description={
                     memberPendingRemove
-                        ? `Remove ${memberPendingRemove.user.name} from this team? They will lose access to projects in this team.`
+                        ? `¿Quitar a ${memberPendingRemove.user.name} de este team? Perderá el acceso a los proyectos del team.`
                         : ''
                 }
-                confirmLabel="Remove"
+                confirmLabel="Quitar"
                 onConfirm={() => {
                     const m = memberPendingRemove;
 
@@ -543,13 +678,13 @@ export default function TeamShow() {
                         setInvitationPendingCancel(null);
                     }
                 }}
-                title="Cancel invitation"
+                title="Cancelar invitación"
                 description={
                     invitationPendingCancel
-                        ? `Cancel the invitation sent to ${invitationPendingCancel.email}?`
+                        ? `¿Cancelar la invitación enviada a ${invitationPendingCancel.email}?`
                         : ''
                 }
-                confirmLabel="Cancel invitation"
+                confirmLabel="Cancelar invitación"
                 onConfirm={() => {
                     const inv = invitationPendingCancel;
 

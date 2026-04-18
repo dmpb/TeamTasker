@@ -54,14 +54,6 @@ class TeamService
     }
 
     /**
-     * @return list<array{id: int, name: string, email: string}>
-     */
-    public function searchUsersNotInTeam(Team $team, string $query, int $limit = 12): array
-    {
-        return $this->teamRepository->searchUsersNotInTeam($team, $query, $limit);
-    }
-
-    /**
      * Adds or updates a member with role admin or member (not owner; owner is set only at team creation).
      */
     public function addMemberToTeam(Team $team, User $user, string $role = 'member'): TeamMember

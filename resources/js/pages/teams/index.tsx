@@ -214,7 +214,7 @@ export default function TeamsIndex() {
                         <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                             {list.map((team) => (
                                 <li key={team.id}>
-                                    <Card className="h-full py-0">
+                                    <Card className="h-full py-0 gap-1">
                                         <CardHeader className="flex flex-row items-center gap-3 space-y-0 pt-6">
                                             <div
                                                 className="flex size-11 shrink-0 items-center justify-center rounded-md bg-primary/10 text-sm font-semibold text-primary"
