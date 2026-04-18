@@ -8,6 +8,7 @@ use App\Models\TeamMember;
 use App\Models\User;
 use App\Repositories\TeamRepository;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -18,12 +19,15 @@ class TeamService
     /**
      * Crea un equipo y agrega al owner como miembro con rol "owner".
      *
-     * @param  array{ name: string }  $data
+     * @param  array{name: string, description?: string|null}  $data
      */
     public function createTeam(User $owner, array $data): Team
     {
         return DB::transaction(function () use ($owner, $data): Team {
-            $team = $this->teamRepository->createTeam($owner, $data['name']);
+            $team = $this->teamRepository->createTeam($owner, [
+                'name' => $data['name'],
+                'description' => $data['description'] ?? null,
+            ]);
 
             $this->addUserToTeam($team, $owner, TeamMemberRole::Owner->value);
 
@@ -34,6 +38,14 @@ class TeamService
     public function getUserTeams(User $user): Collection
     {
         return $this->teamRepository->getTeamsByUser($user);
+    }
+
+    /**
+     * @return LengthAwarePaginator<int, Team>
+     */
+    public function paginateUserTeams(User $user, int $perPage): LengthAwarePaginator
+    {
+        return $this->teamRepository->paginateTeamsByUser($user, $perPage);
     }
 
     public function getMembership(Team $team, User $user): ?TeamMember

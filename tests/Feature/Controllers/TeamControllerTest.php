@@ -6,6 +6,7 @@ use App\Models\TeamInvitation;
 use App\Models\TeamMember;
 use App\Models\User;
 use App\Services\TeamService;
+use Illuminate\Support\Collection;
 use Tests\TestCase;
 
 beforeEach(function () {
@@ -36,16 +37,59 @@ it('renders the teams page with authenticated user teams', function () {
         ->assertOk()
         ->assertInertia(function ($page) use ($ownedTeam, $memberTeam, $excludedTeam) {
             $page->component('teams/index')
-                ->has('teams')
-                ->where('teams', function ($teams) use ($ownedTeam, $memberTeam, $excludedTeam) {
-                    $ids = collect($teams)->pluck('id')->all();
+                ->has('teams.data')
+                ->where('teams.total', 2)
+                ->where('teams', function (mixed $teams) use ($ownedTeam, $memberTeam, $excludedTeam) {
+                    $payload = $teams instanceof Collection ? $teams->all() : $teams;
+
+                    expect($payload)->toBeArray()
+                        ->and($payload)->toHaveKeys(['data', 'current_page', 'last_page', 'per_page', 'total']);
+
+                    $ids = collect($payload['data'])->pluck('id')->all();
 
                     expect($ids)->toContain($ownedTeam->uuid, $memberTeam->uuid)
                         ->not->toContain($excludedTeam->uuid);
 
+                    $owned = collect($payload['data'])->firstWhere('id', $ownedTeam->uuid);
+                    $member = collect($payload['data'])->firstWhere('id', $memberTeam->uuid);
+
+                    expect($owned)->toBeArray()
+                        ->and($owned)->toHaveKeys(['description', 'projects_count', 'members_count', 'is_owner'])
+                        ->and($owned['is_owner'])->toBeTrue()
+                        ->and($member['is_owner'])->toBeFalse();
+
                     return true;
                 });
         });
+});
+
+it('paginates teams on the teams index', function () {
+    /** @var User $user */
+    $user = User::factory()->create();
+
+    Team::factory()->count(15)->forOwner($user)->create();
+
+    /** @var TestCase $this */
+    $this->actingAs($user)
+        ->get(route('teams.index'))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('teams/index')
+            ->where('teams.total', 15)
+            ->where('teams.per_page', 12)
+            ->where('teams.last_page', 2)
+            ->where('teams.current_page', 1)
+            ->has('teams.data', 12)
+            ->where('teams.next_page_url', fn ($url) => is_string($url) && str_contains($url, 'page=2')));
+
+    $this->actingAs($user)
+        ->get(route('teams.index', ['page' => 2]))
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('teams/index')
+            ->where('teams.current_page', 2)
+            ->has('teams.data', 3)
+            ->where('teams.prev_page_url', fn ($url) => is_string($url) && str_contains($url, 'page=1')));
 });
 
 it('stores a new team for the authenticated user', function () {
@@ -53,16 +97,20 @@ it('stores a new team for the authenticated user', function () {
     $user = User::factory()->create();
 
     /** @var TestCase $this */
-    $this->actingAs($user)
+    $response = $this->actingAs($user)
         ->from(route('teams.index'))
         ->post(route('teams.store'), [
             'name' => 'New Team',
-        ])
-        ->assertRedirect(route('teams.index'));
+            'description' => 'Equipo de prueba',
+        ]);
 
     $team = Team::query()->where('name', 'New Team')->first();
 
-    expect($team)->not->toBeNull();
+    expect($team)->not->toBeNull()
+        ->and($team->description)->toBe('Equipo de prueba');
+
+    $response->assertRedirect(route('teams.show', $team))
+        ->assertSessionHas('success');
 
     $membership = TeamMember::query()
         ->where('team_id', $team->id)
@@ -85,6 +133,21 @@ it('validates team name', function () {
         ])
         ->assertRedirect(route('teams.index'))
         ->assertSessionHasErrors('name');
+});
+
+it('validates team description length', function () {
+    /** @var User $user */
+    $user = User::factory()->create();
+
+    /** @var TestCase $this */
+    $this->actingAs($user)
+        ->from(route('teams.index'))
+        ->post(route('teams.store'), [
+            'name' => 'Valid name',
+            'description' => str_repeat('a', 5001),
+        ])
+        ->assertRedirect(route('teams.index'))
+        ->assertSessionHasErrors('description');
 });
 
 it('redirects guests from teams routes to login', function () {
@@ -133,6 +196,7 @@ it('shows a team to members and owners with inertia', function () {
     $member = User::factory()->create();
     $team = Team::factory()->forOwner($owner)->create([
         'name' => 'Visible Team',
+        'description' => 'Equipo visible para pruebas',
     ]);
     TeamMember::factory()->forTeam($team)->forUser($member)->create();
 
@@ -143,6 +207,7 @@ it('shows a team to members and owners with inertia', function () {
         ->assertInertia(fn ($page) => $page
             ->component('teams/show')
             ->where('team.name', 'Visible Team')
+            ->where('team.description', 'Equipo visible para pruebas')
             ->where('can.manageMembers', true)
             ->has('invitations')
             ->has('memberSuggestions'));

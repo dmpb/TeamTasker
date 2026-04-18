@@ -9,11 +9,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import AppLayout from '@/layouts/app-layout';
+import { index as teamsIndex, show as teamsShow } from '@/routes/teams';
 import {
     destroy as destroyTeamMember,
     update as updateTeamMember,
 } from '@/routes/teams/members';
-import { index as teamsIndex, show as teamsShow } from '@/routes/teams';
 import { index as teamProjectsIndex } from '@/routes/teams/projects';
 import type { BreadcrumbItem } from '@/types';
 
@@ -49,6 +49,7 @@ type TeamShowProps = {
     team: {
         id: string;
         name: string;
+        description: string | null;
         owner_id: number;
     };
     members: MemberRow[];
@@ -90,9 +91,11 @@ export default function TeamShow() {
 
     const runMemberSuggestionSearch = (): void => {
         const q = userSearchDraft.trim();
+
         if (q.length < 2) {
             return;
         }
+
         router.get(
             teamsShow.url({ team: team.id }, { query: { user_q: q } }),
             {},
@@ -115,6 +118,7 @@ export default function TeamShow() {
         const el = document.getElementById(
             'invite-email',
         ) as HTMLInputElement | null;
+
         if (el) {
             el.value = email;
             el.focus();
@@ -130,20 +134,26 @@ export default function TeamShow() {
                     <Heading
                         variant="small"
                         title={team.name}
-                        description="Members, invitations, and access for this team."
+                        description={
+                            team.description?.trim()
+                                ? team.description
+                                : 'Miembros, invitaciones y acceso para este team.'
+                        }
                     />
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                         <Link
                             href={teamProjectsIndex(team.id)}
+                            prefetch
                             className="text-sm font-medium text-muted-foreground underline-offset-4 hover:underline"
                         >
-                            Projects
+                            Proyectos
                         </Link>
                         <Link
                             href={teamsIndex()}
+                            prefetch
                             className="text-sm text-muted-foreground underline-offset-4 hover:underline"
                         >
-                            Back to teams
+                            Volver a Teams
                         </Link>
                     </div>
                 </div>
@@ -510,9 +520,11 @@ export default function TeamShow() {
                 confirmLabel="Remove"
                 onConfirm={() => {
                     const m = memberPendingRemove;
+
                     if (!m) {
                         return;
                     }
+
                     setMemberPendingRemove(null);
                     router.delete(
                         destroyTeamMember.url({
@@ -540,9 +552,11 @@ export default function TeamShow() {
                 confirmLabel="Cancel invitation"
                 onConfirm={() => {
                     const inv = invitationPendingCancel;
+
                     if (!inv) {
                         return;
                     }
+
                     setInvitationPendingCancel(null);
                     router.delete(
                         TeamInvitationController.destroy.url({

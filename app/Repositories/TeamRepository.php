@@ -7,14 +7,19 @@ use App\Models\Team;
 use App\Models\TeamMember;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
 class TeamRepository
 {
-    public function createTeam(User $owner, string $name): Team
+    /**
+     * @param  array{name: string, description?: string|null}  $attributes
+     */
+    public function createTeam(User $owner, array $attributes): Team
     {
         return Team::query()->create([
-            'name' => $name,
+            'name' => $attributes['name'],
+            'description' => $attributes['description'] ?? null,
             'owner_id' => $owner->id,
         ]);
     }
@@ -62,8 +67,21 @@ class TeamRepository
     {
         return Team::query()
             ->accessibleByUser($user)
+            ->withCount(['projects', 'members'])
             ->orderByDesc('id')
             ->get();
+    }
+
+    /**
+     * @return LengthAwarePaginator<int, Team>
+     */
+    public function paginateTeamsByUser(User $user, int $perPage): LengthAwarePaginator
+    {
+        return Team::query()
+            ->accessibleByUser($user)
+            ->withCount(['projects', 'members'])
+            ->orderByDesc('id')
+            ->paginate($perPage);
     }
 
     /**

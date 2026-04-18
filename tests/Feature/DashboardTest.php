@@ -44,7 +44,7 @@ test('shared inertia data includes teams for sidebar project shortcuts', functio
         ->assertOk()
         ->assertInertia(fn ($page) => $page
             ->has('teamsForNav', 1)
-            ->where('teamsForNav.0.id', $team->id)
+            ->where('teamsForNav.0.id', $team->uuid)
             ->where('teamsForNav.0.name', 'Sidebar Team'));
 });
 

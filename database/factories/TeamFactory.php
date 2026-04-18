@@ -20,6 +20,7 @@ class TeamFactory extends Factory
     {
         return [
             'name' => fake()->unique()->company(),
+            'description' => null,
             'owner_id' => User::factory(),
         ];
     }

@@ -29,13 +29,27 @@ class TeamController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        $teams = $this->teamService->getUserTeams($user);
+        $perPage = max(1, min((int) $request->query('per_page', 12), 50));
+
+        $teamsPaginator = $this->teamService
+            ->paginateUserTeams($user, $perPage)
+            ->withQueryString();
+
+        $teamsPaginator->setCollection(
+            $teamsPaginator->getCollection()->map(function (Team $team) use ($user): array {
+                return [
+                    'id' => $team->uuid,
+                    'name' => $team->name,
+                    'description' => $team->description,
+                    'projects_count' => (int) $team->projects_count,
+                    'members_count' => (int) $team->members_count,
+                    'is_owner' => $team->owner_id === $user->id,
+                ];
+            }),
+        );
 
         return Inertia::render('teams/index', [
-            'teams' => $teams->map(static fn (Team $team): array => [
-                'id' => $team->uuid,
-                'name' => $team->name,
-            ])->values()->all(),
+            'teams' => $teamsPaginator,
         ]);
     }
 
@@ -81,6 +95,7 @@ class TeamController extends Controller
             'team' => [
                 'id' => $team->uuid,
                 'name' => $team->name,
+                'description' => $team->description,
                 'owner_id' => $team->owner_id,
             ],
             'members' => $team->members->map(function ($member) use ($canManageMembers, $team): array {
@@ -111,12 +126,14 @@ class TeamController extends Controller
         /** @var User $user */
         $user = $request->user();
 
-        /** @var array{ name: string } $validated */
+        /** @var array{name: string, description?: string|null} $validated */
         $validated = $request->validated();
 
-        $this->teamService->createTeam($user, $validated);
+        $team = $this->teamService->createTeam($user, $validated);
 
-        return back()->with('success', __('Team created.'));
+        return redirect()
+            ->route('teams.show', $team)
+            ->with('success', __('Team created successfully.'));
     }
 
     public function storeMember(StoreTeamMemberRequest $request, Team $team): RedirectResponse

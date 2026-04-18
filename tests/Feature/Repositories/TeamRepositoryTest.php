@@ -10,10 +10,14 @@ it('creates a team for an owner', function () {
     $owner = User::factory()->create();
     $repository = app(TeamRepository::class);
 
-    $team = $repository->createTeam($owner, 'Core Team');
+    $team = $repository->createTeam($owner, [
+        'name' => 'Core Team',
+        'description' => 'Internal platform',
+    ]);
 
     expect($team)->toBeInstanceOf(Team::class)
         ->and($team->name)->toBe('Core Team')
+        ->and($team->description)->toBe('Internal platform')
         ->and($team->owner_id)->toBe($owner->id);
 });
 

@@ -10,11 +10,15 @@ it('creates a team with owner membership', function () {
     $owner = User::factory()->create();
     $service = app(TeamService::class);
 
-    $team = $service->createTeam($owner, ['name' => 'Engineering']);
+    $team = $service->createTeam($owner, [
+        'name' => 'Engineering',
+        'description' => 'Product and infra',
+    ]);
 
     expect($team)->toBeInstanceOf(Team::class)
         ->and($team->owner_id)->toBe($owner->id)
-        ->and($team->name)->toBe('Engineering');
+        ->and($team->name)->toBe('Engineering')
+        ->and($team->description)->toBe('Product and infra');
 
     $ownerMembership = TeamMember::query()
         ->where('team_id', $team->id)
