@@ -5,7 +5,9 @@ use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\TeamMember;
 use App\Models\User;
+use App\Notifications\TeamInvitationReceivedNotification;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 beforeEach(function () {
@@ -32,8 +34,10 @@ it('redirects guests from team invitation management routes', function () {
 
 it('allows owners to create invitations and queues mail', function () {
     Mail::fake();
+    Notification::fake();
 
     $owner = User::factory()->create();
+    $invitee = User::factory()->create(['email' => 'invitee@example.com']);
     $team = Team::factory()->forOwner($owner)->create();
 
     /** @var TestCase $this */
@@ -48,6 +52,31 @@ it('allows owners to create invitations and queues mail', function () {
     expect(TeamInvitation::query()->where('team_id', $team->id)->count())->toBe(1);
 
     Mail::assertQueued(TeamInvitationMail::class);
+
+    Notification::assertSentTo($invitee, TeamInvitationReceivedNotification::class);
+});
+
+it('rejects invitations for emails without a registered account', function () {
+    Mail::fake();
+    Notification::fake();
+
+    $owner = User::factory()->create();
+    $team = Team::factory()->forOwner($owner)->create();
+
+    /** @var TestCase $this */
+    $this->actingAs($owner)
+        ->from(route('teams.show', $team))
+        ->post(route('teams.invitations.store', $team), [
+            'email' => 'no-user@example.com',
+            'role' => 'member',
+        ])
+        ->assertRedirect(route('teams.show', $team))
+        ->assertSessionHasErrors('email');
+
+    expect(TeamInvitation::query()->where('team_id', $team->id)->count())->toBe(0);
+
+    Mail::assertNothingOutgoing();
+    Notification::assertNothingSent();
 });
 
 it('forbids plain members from creating invitations', function () {
@@ -72,8 +101,10 @@ it('forbids plain members from creating invitations', function () {
 
 it('allows owners to cancel and resend invitations', function () {
     Mail::fake();
+    Notification::fake();
 
     $owner = User::factory()->create();
+    User::factory()->create(['email' => 'keep@example.com']);
     $team = Team::factory()->forOwner($owner)->create();
     $invitation = TeamInvitation::factory()
         ->forTeam($team)

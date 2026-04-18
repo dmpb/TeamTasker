@@ -49,7 +49,7 @@ export default function NotificationsIndex() {
                     <Heading
                         variant="small"
                         title="Notificaciones"
-                        description="Tareas asignadas y comentarios en tareas donde eres responsable."
+                        description="Tareas asignadas, comentarios e invitaciones a teams. Abre una fila para ir al enlace."
                     />
                     <Form {...NotificationController.markAllRead.form()}>
                         {({ processing }) => (

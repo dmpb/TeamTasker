@@ -5,13 +5,17 @@ use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\TeamMember;
 use App\Models\User;
+use App\Notifications\TeamInvitationReceivedNotification;
 use App\Services\TeamInvitationService;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 
 it('creates an invitation and queues mail', function () {
     Mail::fake();
+    Notification::fake();
 
     $owner = User::factory()->create();
+    $invitee = User::factory()->create(['email' => 'newuser@example.com']);
     $team = Team::factory()->forOwner($owner)->create();
 
     $service = app(TeamInvitationService::class);
@@ -23,22 +27,37 @@ it('creates an invitation and queues mail', function () {
     Mail::assertQueued(TeamInvitationMail::class, function (TeamInvitationMail $mail): bool {
         return $mail->invitation->email === 'newuser@example.com';
     });
+
+    Notification::assertSentTo($invitee, TeamInvitationReceivedNotification::class);
 });
 
 it('rejects duplicate open invitations for the same email', function () {
     Mail::fake();
+    Notification::fake();
 
     $owner = User::factory()->create();
+    User::factory()->create(['email' => 'dup@example.com']);
     $team = Team::factory()->forOwner($owner)->create();
     $service = app(TeamInvitationService::class);
 
     $service->createInvitation($team, $owner, 'dup@example.com', 'member', sendMail: false);
 
     $service->createInvitation($team, $owner, 'Dup@Example.com', 'admin', sendMail: false);
-})->throws(InvalidArgumentException::class);
+})->throws(\InvalidArgumentException::class);
+
+it('rejects invitation when the email is not a registered user', function () {
+    Mail::fake();
+
+    $owner = User::factory()->create();
+    $team = Team::factory()->forOwner($owner)->create();
+    $service = app(TeamInvitationService::class);
+
+    $service->createInvitation($team, $owner, 'not-registered@example.com', 'member', sendMail: false);
+})->throws(\InvalidArgumentException::class);
 
 it('rejects invitation when user is already a member', function () {
     Mail::fake();
+    Notification::fake();
 
     $owner = User::factory()->create();
     $member = User::factory()->create(['email' => 'member@example.com']);
@@ -47,10 +66,11 @@ it('rejects invitation when user is already a member', function () {
 
     $service = app(TeamInvitationService::class);
     $service->createInvitation($team, $owner, 'member@example.com', 'member', sendMail: false);
-})->throws(InvalidArgumentException::class);
+})->throws(\InvalidArgumentException::class);
 
 it('accepts invitation and creates membership', function () {
     Mail::fake();
+    Notification::fake();
 
     $owner = User::factory()->create();
     $invitee = User::factory()->create(['email' => 'join@example.com']);
@@ -68,7 +88,10 @@ it('accepts invitation and creates membership', function () {
 });
 
 it('rejects accept with wrong email user', function () {
+    Notification::fake();
+
     $owner = User::factory()->create();
+    User::factory()->create(['email' => 'target@example.com']);
     $other = User::factory()->create(['email' => 'other@example.com']);
     $team = Team::factory()->forOwner($owner)->create();
 
@@ -76,7 +99,7 @@ it('rejects accept with wrong email user', function () {
     $invitation = $service->createInvitation($team, $owner, 'target@example.com', 'member', sendMail: false);
 
     $service->acceptInvitationForUser($invitation->token, $other);
-})->throws(InvalidArgumentException::class);
+})->throws(\InvalidArgumentException::class);
 
 it('rejects expired invitation', function () {
     $owner = User::factory()->create();
@@ -91,4 +114,4 @@ it('rejects expired invitation', function () {
 
     $service = app(TeamInvitationService::class);
     $service->acceptInvitationForUser($invitation->token, $invitee);
-})->throws(InvalidArgumentException::class);
+})->throws(\InvalidArgumentException::class);

@@ -6,6 +6,7 @@ use App\Mail\TeamInvitationMail;
 use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
+use App\Notifications\TeamInvitationReceivedNotification;
 use App\Repositories\TeamInvitationRepository;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -42,9 +43,13 @@ class TeamInvitationService
     {
         $normalizedEmail = $this->normalizeEmail($email);
 
-        $existingMember = User::query()->where('email', $normalizedEmail)->first();
+        $invitee = User::query()->whereRaw('lower(email) = ?', [$normalizedEmail])->first();
 
-        if ($existingMember !== null && $this->teamService->getMembership($team, $existingMember) !== null) {
+        if ($invitee === null) {
+            throw new InvalidArgumentException(__('No registered account exists for this email address.'));
+        }
+
+        if ($this->teamService->getMembership($team, $invitee) !== null) {
             throw new InvalidArgumentException(__('This user is already a member of the team.'));
         }
 
@@ -67,6 +72,8 @@ class TeamInvitationService
         if ($sendMail) {
             $this->queueInvitationMail($invitation);
         }
+
+        $this->notifyInviteeIfRegistered($invitation);
 
         return $invitation;
     }
@@ -105,6 +112,8 @@ class TeamInvitationService
         $invitation->load(['team', 'inviter']);
 
         $this->queueInvitationMail($invitation);
+
+        $this->notifyInviteeIfRegistered($invitation);
 
         return $invitation;
     }
@@ -188,5 +197,20 @@ class TeamInvitationService
     private function queueInvitationMail(TeamInvitation $invitation): void
     {
         Mail::to($invitation->email)->queue(new TeamInvitationMail($invitation));
+    }
+
+    private function notifyInviteeIfRegistered(TeamInvitation $invitation): void
+    {
+        $invitation->loadMissing(['team', 'inviter']);
+
+        $invitee = User::query()
+            ->whereRaw('lower(email) = ?', [$this->normalizeEmail($invitation->email)])
+            ->first();
+
+        if ($invitee === null) {
+            return;
+        }
+
+        $invitee->notify(new TeamInvitationReceivedNotification($invitation));
     }
 }
