@@ -177,8 +177,8 @@ export function BoardColumnDropZone({ columnId, disabled }: { columnId: number; 
 }
 
 type BoardTasksDndProps = {
-    teamId: number;
-    projectId: number;
+    teamId: string;
+    projectId: string;
     filters: BoardFilters;
     disabled: boolean;
     columns: { id: number; tasks: { id: number }[] }[];

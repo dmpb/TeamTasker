@@ -370,7 +370,7 @@ export default function TeamShow() {
 
                 {can.manageMembers ? (
                     <section className="space-y-3">
-                        <Card className="py-0">
+                        <Card className="py-0 gap-1">
                             <CardHeader className="pb-0 pt-6">
                                 <CardTitle className="text-base font-medium">
                                     Invitaciones pendientes
